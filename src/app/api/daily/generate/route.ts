@@ -14,6 +14,7 @@ import {
   createGenerationLog,
   updateGenerationLog,
   getDailyReportByDate,
+  publishAllPendingNews,
 } from "@/lib/services/db-service";
 
 /**
@@ -50,6 +51,10 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Step 0: 自动发布所有pending新闻（到时间自动发布，不管是否人工审核）
+    console.log(`[Daily] Step 0: Auto-publishing pending news`);
+    await publishAllPendingNews();
+
     // Step 1: 搜索AI相关新闻
     console.log(`[Daily] Step 1: Searching AI news for ${targetDate}`);
     const searchResults = await searchDateAI(targetDate);
@@ -62,8 +67,8 @@ export async function POST(request: NextRequest) {
 
     // Step 3: 获取Top条目的详细内容（用于更精准的摘要）
     console.log(`[Daily] Step 3: Fetching details for top ${Math.min(dedupedResults.length, 10)} items`);
-    const topUrls = dedupedResults.slice(0, 10).map((r) => r.url).filter(Boolean);
-    const fetchResults = await fetchMultipleURLs(topUrls, { concurrency: 3, maxLength: 3000 });
+    const topUrls = dedupedResults.slice(0, 30).map((r) => r.url).filter(Boolean);
+    const fetchResults = await fetchMultipleURLs(topUrls, { concurrency: 5, maxLength: 5000 });
     const fetchedMap = new Map(fetchResults.filter((r) => r.success).map((r) => [r.url, r]));
 
     // Step 4: AI处理（分类 + 打分 + 摘要）

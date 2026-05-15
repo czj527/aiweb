@@ -23,12 +23,16 @@ export const newsItems = pgTable(
     keywords: jsonb("keywords").$type<string[]>(),
     published_at: timestamp("published_at", { withTimezone: true }),
     is_ai_related: boolean("is_ai_related").notNull().default(true),
+    status: varchar("status", { length: 20 }).notNull().default("pending"),
+    reviewed_at: timestamp("reviewed_at", { withTimezone: true }),
+    reject_reason: text("reject_reason"),
     created_at: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index("news_items_category_idx").on(table.category),
     index("news_items_published_at_idx").on(table.published_at),
     index("news_items_importance_level_idx").on(table.importance_level),
+    index("news_items_status_idx").on(table.status),
     index("news_items_source_url_idx").on(table.source_url),
   ]
 );
@@ -144,5 +148,24 @@ export const generationLogs = pgTable(
   (table) => [
     index("generation_logs_type_date_idx").on(table.type, table.target_date),
     index("generation_logs_status_idx").on(table.status),
+  ]
+);
+
+// 审核日志表
+export const reviewLogs = pgTable(
+  "review_logs",
+  {
+    id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+    news_id: varchar("news_id", { length: 36 }).notNull().references(() => newsItems.id, { onDelete: "cascade" }),
+    action: varchar("action", { length: 20 }).notNull(), // approve / reject / edit
+    previous_status: varchar("previous_status", { length: 20 }),
+    new_status: varchar("new_status", { length: 20 }),
+    reviewer: varchar("reviewer", { length: 100 }),
+    reason: text("reason"),
+    created_at: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("review_logs_news_id_idx").on(table.news_id),
+    index("review_logs_created_at_idx").on(table.created_at),
   ]
 );

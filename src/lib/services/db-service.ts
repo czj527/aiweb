@@ -674,3 +674,84 @@ export async function getRecentNews(hours: number = 24, limit: number = 50): Pro
   if (error) throw new Error(`获取最近新闻失败: ${error.message}`);
   return data || [];
 }
+
+// ============================================================
+// 审核相关函数
+// ============================================================
+
+/** 获取待审核新闻 */
+export async function getPendingNews(days: number = 7): Promise<NewsItemRow[]> {
+  const client = getSupabaseClient();
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await client
+    .from("news_items")
+    .select("*")
+    .eq("status", "pending")
+    .gte("created_at", since)
+    .order("importance_score", { ascending: false });
+  if (error) throw new Error(`获取待审核新闻失败: ${error.message}`);
+  return data || [];
+}
+
+/** 更新新闻状态 */
+export async function updateNewsStatus(id: string, status: string, reason?: string) {
+  const client = getSupabaseClient();
+  const update: Record<string, unknown> = { status, reviewed_at: new Date().toISOString() };
+  if (reason) update.reject_reason = reason;
+  const { error } = await client
+    .from("news_items")
+    .update(update)
+    .eq("id", id);
+  if (error) throw new Error(`更新新闻状态失败: ${error.message}`);
+}
+
+/** 审核新闻（含日志） */
+export async function reviewNews(id: string, action: "approve" | "reject", reason?: string) {
+  const client = getSupabaseClient();
+  const { data: news } = await client.from("news_items").select("status").eq("id", id).single();
+  const previousStatus = news?.status || "pending";
+  const newStatus = action === "approve" ? "published" : "rejected";
+  await updateNewsStatus(id, newStatus, reason);
+  await client.from("review_logs").insert({
+    news_id: id, action, previous_status: previousStatus, new_status: newStatus, reviewer: "admin", reason
+  });
+}
+
+/** 批量审核 */
+export async function batchReviewNews(ids: string[], action: "approve" | "reject", reason?: string) {
+  for (const id of ids) {
+    await reviewNews(id, action, reason);
+  }
+}
+
+/** 发布所有pending新闻（日报生成时调用） */
+export async function publishAllPendingNews() {
+  const client = getSupabaseClient();
+  const { error } = await client
+    .from("news_items")
+    .update({ status: "published", reviewed_at: new Date().toISOString() })
+    .eq("status", "pending");
+  if (error) throw new Error(`自动发布pending新闻失败: ${error.message}`);
+  console.log("[DB] All pending news auto-published");
+}
+
+/** 获取pending新闻数量 */
+export async function getPendingNewsCount(): Promise<number> {
+  const client = getSupabaseClient();
+  const { count, error } = await client
+    .from("news_items")
+    .select("*", { count: "exact", head: true })
+    .eq("status", "pending");
+  if (error) throw new Error(`获取pending数量失败: ${error.message}`);
+  return count || 0;
+}
+
+/** 编辑新闻 */
+export async function editNews(id: string, updates: { title?: string; summary?: string; category?: string; importance_score?: number; importance_level?: string }) {
+  const client = getSupabaseClient();
+  const { error } = await client
+    .from("news_items")
+    .update(updates)
+    .eq("id", id);
+  if (error) throw new Error(`编辑新闻失败: ${error.message}`);
+}

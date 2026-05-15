@@ -47,6 +47,10 @@ export const NEWS_SOURCES: SourceConfig[] = [
   { name: "MIT Technology Review", domain: "technologyreview.com", priority: "S", type: "rss", keywords: ["AI", "artificial intelligence"] },
   { name: "AWS AI Blog", domain: "aws.amazon.com", priority: "S", type: "rss", keywords: ["AWS AI", "Bedrock", "SageMaker"] },
 
+
+  // === 社交媒体源 ===
+  { name: "Twitter/X AI", domain: "x.com", priority: "S", type: "social", keywords: ["AI", "GPT", "Claude", "Gemini", "LLM", "agent"] },
+  { name: "Nitter AI", domain: "nitter.net", priority: "A", type: "social", keywords: ["AI", "GPT", "Claude", "Gemini", "LLM"] },
   // === A 级：社区与学术 ===
   { name: "Reddit ML", domain: "reddit.com", priority: "A", type: "rss", keywords: ["MachineLearning", "artificial"] },
   { name: "ArXiv cs.AI", domain: "arxiv.org", priority: "A", type: "rss", keywords: ["cs.AI", "artificial intelligence paper"] },
@@ -183,6 +187,15 @@ export async function searchDateAI(
     allResults.push(...results);
   }
 
+
+  // ---- 阶段4: 社交媒体AI KOL动态 ----
+  console.log(`[Search] Phase 4: Social media AI KOL search`);
+  const socialKOLs = ["OpenAI", "AnthropicAI", "GoogleDeepMind", "ylecun", "AndrewYNg", "sama"];
+  for (const kol of socialKOLs) {
+    const query = `site:x.com OR site:nitter.net ${kol} AI ${targetDate}`;
+    const results = await searchAI(query, { count: 5, timeRange });
+    allResults.push(...results);
+  }
   // ---- URL去重 ----
   const seen = new Set<string>();
   const deduped = allResults.filter((r) => {

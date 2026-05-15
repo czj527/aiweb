@@ -9,7 +9,7 @@ import {
 import { upsertNewsItems, createGenerationLog, updateGenerationLog } from "@/lib/services/db-service";
 
 function getToday(): string {
-  return new Date().toISOString().slice(0, 10);
+  return new Date().toISOString().slice(0, 30);
 }
 
 /**
@@ -47,8 +47,8 @@ export async function POST(request: NextRequest) {
 
     // Step 3: 获取Top条目的详细内容
     console.log(`[Collect] Step 3: Fetching details for top ${Math.min(dedupedResults.length, 10)} items`);
-    const topUrls = dedupedResults.slice(0, 10).map((r) => r.url).filter(Boolean);
-    const fetchResults = await fetchMultipleURLs(topUrls, { concurrency: 3, maxLength: 3000 });
+    const topUrls = dedupedResults.slice(0, 30).map((r) => r.url).filter(Boolean);
+    const fetchResults = await fetchMultipleURLs(topUrls, { concurrency: 5, maxLength: 5000 });
     const fetchedMap = new Map(fetchResults.filter((r) => r.success).map((r) => [r.url, r]));
 
     // Step 4: AI处理（分类 + 打分 + 摘要）

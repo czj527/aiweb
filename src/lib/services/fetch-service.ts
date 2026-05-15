@@ -94,7 +94,7 @@ export async function fetchMultipleURLs(
   urls: string[],
   options: { concurrency?: number; maxLength?: number } = {}
 ): Promise<FetchResult[]> {
-  const { concurrency = 3, maxLength = 3000 } = options;
+  const { concurrency = 5, maxLength = 5000 } = options;
 
   const results: FetchResult[] = [];
 

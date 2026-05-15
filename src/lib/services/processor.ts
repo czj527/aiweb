@@ -25,6 +25,39 @@ function getSourcePriority(url: string): SourcePriority | null {
   return null;
 }
 
+
+/** URL标准化：去除追踪参数，统一格式 */
+function normalizeUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    const paramsToRemove = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'ref', 'spm', 'from', 'isappinstalled', 'nsukey', 'share_token'];
+    paramsToRemove.forEach(p => u.searchParams.delete(p));
+    u.pathname = u.pathname.replace(/\/+$/, '');
+    return u.toString().toLowerCase();
+  } catch {
+    return url.toLowerCase();
+  }
+}
+
+/** 标题词频相似度（Jaccard系数） */
+function titleSimilarity(a: string, b: string): number {
+  const wordsA = a.toLowerCase().split(/\s+/);
+  const wordsB = b.toLowerCase().split(/\s+/);
+  const setA = new Set(wordsA);
+  const setB = new Set(wordsB);
+  const intersection = new Set([...setA].filter(x => setB.has(x)));
+  const union = new Set([...setA, ...setB]);
+  return union.size === 0 ? 0 : intersection.size / union.size;
+}
+
+/** 判断新闻是否在24小时内 */
+function isWithin24Hours(publishedAt: string): boolean {
+  if (!publishedAt) return true; // 无日期的保留，由AI后续判断
+  const pubDate = new Date(publishedAt);
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  return pubDate >= cutoff;
+}
+
 /**
  * 对内容质量进行评级（0-10）
  * 用于过滤低质量/空泛内容
@@ -47,6 +80,27 @@ function applySourceBoost(news: ProcessedNews[]): ProcessedNews[] {
       case "A":   boost = 0; break;  // 社区/学术不加分
       default:    boost = 0; break;  // 未知信源不加分
     }
+    const boostedScore = n.importanceScore + boost;
+    return {
+      ...n,
+      importanceScore: boostedScore,
+      importanceLevel: boostedScore >= 35 ? "SSS" : boostedScore >= 25 ? "SS" : boostedScore >= 15 ? "S" : "A",
+    };
+  });
+}
+
+
+/** 主题加分：模型发布/Agent/OpenClaw/模型价格 权重更高 */
+function applyTopicBoost(news: ProcessedNews[]): ProcessedNews[] {
+  return news.map(n => {
+    let boost = 0;
+    // 模型发布和Agent分类加分
+    if (n.category === 'model' || n.category === 'agent') boost += 5;
+    // OpenClaw相关加分
+    const text = `${n.title} ${n.summary}`.toLowerCase();
+    if (text.includes('openclaw') || text.includes('open claw') || text.includes('openclaw')) boost += 5;
+    // 模型价格相关加分
+    if (/价格|定价|免费|pricing|price|free tier|api cost|token price|计费/i.test(text)) boost += 3;
     const boostedScore = n.importanceScore + boost;
     return {
       ...n,
@@ -87,11 +141,11 @@ export interface ProcessedNews {
  * 三层去重
  */
 export function deduplicateResults(results: SearchResult[]): SearchResult[] {
-  // 第一层：URL 去重
+  // 第一层：URL 去重（改进的URL标准化）
   const byUrl = new Map<string, SearchResult>();
   for (const r of results) {
     if (!r.url) continue;
-    const normalizedUrl = r.url.replace(/\/$/, "").replace(/https?:\/\//, "");
+    const normalizedUrl = normalizeUrl(r.url);
     if (!byUrl.has(normalizedUrl)) {
       byUrl.set(normalizedUrl, r);
     }
@@ -99,17 +153,17 @@ export function deduplicateResults(results: SearchResult[]): SearchResult[] {
 
   const urlDeduped = Array.from(byUrl.values());
 
-  // 第二层：标题相似度去重（简单实现 - 相同前缀30字符视为重复）
-  const byTitle = new Map<string, SearchResult>();
+  // 第二层：标题语义相似度去重（Jaccard词频重叠度 > 0.7视为重复）
+  const kept: SearchResult[] = [];
   for (const r of urlDeduped) {
     if (!r.title) continue;
-    const titleKey = r.title.toLowerCase().slice(0, 30);
-    if (!byTitle.has(titleKey)) {
-      byTitle.set(titleKey, r);
+    const isDuplicate = kept.some(existing => titleSimilarity(existing.title, r.title) > 0.7);
+    if (!isDuplicate) {
+      kept.push(r);
     }
   }
 
-  return Array.from(byTitle.values());
+  return kept;
 }
 
 /**
@@ -242,8 +296,15 @@ export function filterNews(news: ProcessedNews[]): ProcessedNews[] {
     `[Filter] After quality check: ${filtered.length}/${news.length}`
   );
 
+  // 阶段2.5: 24小时时效性过滤
+  filtered = filtered.filter(n => isWithin24Hours(n.publishedAt));
+  console.log(`[Filter] After 24h recency filter: ${filtered.length}/${news.length}`);
+
   // 阶段3: 应用信息源加分
-  const boosted = applySourceBoost(filtered);
+  const sourceBoosted = applySourceBoost(filtered);
+
+  // 阶段3.5: 应用主题加分（模型发布/Agent/OpenClaw/模型价格 权重更高）
+  const boosted = applyTopicBoost(sourceBoosted);
 
   // 阶段4: 过滤低分（<8分即为B级）
   const scored = boosted.filter((n) => n.importanceScore >= 8);
