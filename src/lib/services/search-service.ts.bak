@@ -1,4 +1,4 @@
-import axios from "axios";
+import { search as ddgSearch } from "duckduckgo-search";
 
 // ============================================================
 // AI Pulse 信息源配置
@@ -47,6 +47,7 @@ export const NEWS_SOURCES: SourceConfig[] = [
   { name: "MIT Technology Review", domain: "technologyreview.com", priority: "S", type: "rss", keywords: ["AI", "artificial intelligence"] },
   { name: "AWS AI Blog", domain: "aws.amazon.com", priority: "S", type: "rss", keywords: ["AWS AI", "Bedrock", "SageMaker"] },
 
+
   // === 社交媒体源 ===
   { name: "Twitter/X AI", domain: "x.com", priority: "S", type: "social", keywords: ["AI", "GPT", "Claude", "Gemini", "LLM", "agent"] },
   { name: "Nitter AI", domain: "nitter.net", priority: "A", type: "social", keywords: ["AI", "GPT", "Claude", "Gemini", "LLM"] },
@@ -65,7 +66,7 @@ export const S_SOURCES = NEWS_SOURCES.filter((s) => s.priority === "S");
 export const A_SOURCES = NEWS_SOURCES.filter((s) => s.priority === "A");
 
 // ============================================================
-// 搜索服务 - 多源搜索（SearXNG + DuckDuckGo fallback）
+// 搜索服务 - 使用 DuckDuckGo 免费搜索
 // ============================================================
 
 export interface SearchResult {
@@ -76,85 +77,40 @@ export interface SearchResult {
   date: string;
 }
 
-// SearXNG 公共实例列表（按可靠性排序）
-const SEARXNG_INSTANCES = [
-  "https://search.sapti.me",
-  "https://searxng.ch",
-  "https://search.bus-hit.me",
-  "https://searx.be",
-  "https://search.mdosch.de",
-];
-
-/**
- * 通过 SearXNG 公共实例搜索
- */
-async function searchSearXNG(
-  query: string,
-  options?: { count?: number; timeRange?: string }
-): Promise<SearchResult[]> {
-  const count = options?.count || 15;
-
-  for (const instance of SEARXNG_INSTANCES) {
-    try {
-      const params: Record<string, string> = {
-        q: query,
-        format: "json",
-        categories: "news,general",
-        pageno: "1",
-      };
-
-      if (options?.timeRange) {
-        params.time_range = options.timeRange === "1d" ? "day" : options.timeRange === "1w" ? "week" : "";
-      }
-
-      const resp = await axios.get(`${instance}/search`, {
-        params,
-        timeout: 15000,
-        headers: {
-          "User-Agent": "Mozilla/5.0 (compatible; AIPulse/1.0)",
-          Accept: "application/json",
-        },
-      });
-
-      if (resp.data?.results && Array.isArray(resp.data.results)) {
-        const results = resp.data.results
-          .slice(0, count)
-          .filter((r: Record<string, unknown>) => r.url && r.title)
-          .map((r: Record<string, unknown>) => ({
-            title: String(r.title || ""),
-            snippet: String(r.content || ""),
-            url: String(r.url || ""),
-            source: extractDomain(String(r.url || "")),
-            date: String(r.publishedDate || ""),
-          }));
-
-        if (results.length > 0) {
-          console.log(`[SearXNG] ${instance} returned ${results.length} results`);
-          return results;
-        }
-      }
-    } catch (e) {
-      console.warn(`[SearXNG] ${instance} failed:`, (e as Error).message);
-      continue;
-    }
-  }
-
-  return [];
+/** DuckDuckGo 搜索结果项接口 */
+interface DDGResult {
+  title: string;
+  description: string;
+  url: string;
+  source?: string;
+  publishedDate?: string;
 }
 
 /**
- * 通用搜索 — 多源 fallback
+ * 通用搜索 — 使用 DuckDuckGo（免费，无需 API Key）
  */
 export async function searchAI(
   query: string,
   options?: { count?: number; timeRange?: string }
 ): Promise<SearchResult[]> {
-  // 优先 SearXNG
-  const searxngResults = await searchSearXNG(query, options);
-  if (searxngResults.length > 0) return searxngResults;
+  try {
+    const results = await ddgSearch(query, {
+      count: options?.count || 15,
+    }) as DDGResult[];
 
-  console.warn("[Search] SearXNG returned 0 for query:", query);
-  return [];
+    if (!Array.isArray(results) || results.length === 0) return [];
+
+    return results.map((item) => ({
+      title: item.title || "",
+      snippet: item.description || "",
+      url: item.url || "",
+      source: item.source || extractDomain(item.url),
+      date: item.publishedDate || "",
+    }));
+  } catch (e) {
+    console.error(`Search failed for "${query}":`, e);
+    return [];
+  }
 }
 
 /** 从 URL 提取域名作为来源名称 */
@@ -169,6 +125,11 @@ function extractDomain(url: string): string {
 
 /**
  * 分级搜索策略 — 日报/周报专用
+ *
+ * 三阶段搜索：
+ * 1. 定向搜索：对 SSS/SS 级信息源逐个搜索（确保核心来源覆盖）
+ * 2. 通用搜索：用多个通用查询广覆盖（捕获长尾信息）
+ * 3. 媒体补充：搜索 S 级科技媒体（确保中文和产业动态覆盖）
  */
 export async function searchDateAI(
   targetDate: string,
@@ -181,6 +142,7 @@ export async function searchDateAI(
   const coreSources = [...SSS_SOURCES, ...SS_SOURCES];
   console.log(`[Search] Phase 1: Targeted search for ${coreSources.length} core sources`);
 
+  // 按信息源关键词 + 日期组合搜索（每2个源合并一次查询，控制总请求数）
   for (let i = 0; i < coreSources.length; i += 2) {
     const batch = coreSources.slice(i, i + 2);
     const siteQuery = batch
@@ -225,6 +187,7 @@ export async function searchDateAI(
     allResults.push(...results);
   }
 
+
   // ---- 阶段4: 社交媒体AI KOL动态 ----
   console.log(`[Search] Phase 4: Social media AI KOL search`);
   const socialKOLs = ["OpenAI", "AnthropicAI", "GoogleDeepMind", "ylecun", "AndrewYNg", "sama"];
@@ -233,7 +196,6 @@ export async function searchDateAI(
     const results = await searchAI(query, { count: 5, timeRange });
     allResults.push(...results);
   }
-
   // ---- URL去重 ----
   const seen = new Set<string>();
   const deduped = allResults.filter((r) => {
