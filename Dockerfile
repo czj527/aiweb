@@ -41,7 +41,7 @@ RUN adduser --system --uid 1001 nextjs
 COPY --from=builder /app/public ./public
 
 # Set correct permission for prerender cache
-RUN mkdir .next/cache && chown nextjs:nodejs .next/cache
+RUN mkdir -p .next/cache && chown nextjs:nodejs .next/cache
 
 # Copy built application
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
