@@ -4,15 +4,8 @@ import { getSupabaseClient } from "@/storage/database/supabase-client";
 /**
  * POST /api/news/insert
  * 批量插入新闻条目（供外部采集使用）
- * 通过 query参数 token=CRON_SECRET 认证
  */
 export async function POST(request: NextRequest) {
-  const url = new URL(request.url);
-  const token = url.searchParams.get("token");
-  if (process.env.CRON_SECRET && token !== process.env.CRON_SECRET) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const body = await request.json();
   const items = body.items;
 
