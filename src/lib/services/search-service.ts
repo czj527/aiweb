@@ -80,9 +80,9 @@ export interface SearchResult {
 const SEARXNG_INSTANCES = [
   "https://search.sapti.me",
   "https://searxng.ch",
-  "https://search.bus-hit.me",
+  
   "https://searx.be",
-  "https://search.mdosch.de",
+  
 ];
 
 /**
@@ -181,7 +181,7 @@ export async function searchDateAI(
   const coreSources = [...SSS_SOURCES, ...SS_SOURCES];
   console.log(`[Search] Phase 1: Targeted search for ${coreSources.length} core sources`);
 
-  for (let i = 0; i < coreSources.length; i += 2) {
+  for (let i = 0; i < coreSources.length; i += 4) {
     const batch = coreSources.slice(i, i + 2);
     const siteQuery = batch
       .map((s) => `site:${s.domain}`)
@@ -198,8 +198,8 @@ export async function searchDateAI(
       ? [
           `AI大模型 ${targetDate} 最新动态`,
           `artificial intelligence news ${targetDate}`,
-          `大模型发布 AI产品 ${targetDate}`,
-          `LLM breakthrough ${targetDate} GPT Claude Gemini`,
+          
+          
         ]
       : [
           `AI大模型 本周 最新动态 总结`,
@@ -219,15 +219,13 @@ export async function searchDateAI(
     ["jiqizhixin.com", "zhidx.com", "qbitai.com", "36kr.com"].includes(s.domain)
   );
 
-  for (const media of mediaDomains) {
-    const query = `site:${media.domain} AI ${targetDate}`;
-    const results = await searchAI(query, { count: 5, timeRange });
-    allResults.push(...results);
-  }
+  const mediaQuery = mediaDomains.map((s) => `site:${s.domain}`).join(" OR ");
+  const mediaResults = await searchAI(`(${mediaQuery}) AI ${targetDate}`, { count: 15, timeRange });
+  allResults.push(...mediaResults);
 
   // ---- 阶段4: 社交媒体AI KOL动态 ----
   console.log(`[Search] Phase 4: Social media AI KOL search`);
-  const socialKOLs = ["OpenAI", "AnthropicAI", "GoogleDeepMind", "ylecun", "AndrewYNg", "sama"];
+  const socialKOLs = ["OpenAI", "AnthropicAI", "GoogleDeepMind"];
   for (const kol of socialKOLs) {
     const query = `site:x.com OR site:nitter.net ${kol} AI ${targetDate}`;
     const results = await searchAI(query, { count: 5, timeRange });
