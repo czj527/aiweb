@@ -7,7 +7,7 @@ import { getSupabaseClient } from "@/storage/database/supabase-client";
  * 需要 CRON_SECRET 认证
  */
 export async function POST(request: NextRequest) {
-  const auth = request.headers.get("authorization")?.replace("Bearer ", "");
+  const auth = (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
   if (process.env.CRON_SECRET && auth !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
