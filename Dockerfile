@@ -15,6 +15,7 @@ RUN npm install -g pnpm@9 && pnpm install --frozen-lockfile
 
 # Rebuild the source code only when needed
 FROM base AS builder
+RUN npm install -g pnpm@9
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
