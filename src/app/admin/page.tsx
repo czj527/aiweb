@@ -7,13 +7,20 @@ interface NewsItem {
   id: string;
   title: string;
   summary: string;
-  source: string;
+  source_name: string;
+  source?: string;
   sourceUrl: string;
+  source_url: string;
   category: string;
+  importance_score: number;
   importanceScore: number;
+  importance_level: string;
   importanceLevel: string;
   keywords: string[];
+  published_at: string;
   publishedAt: string;
+  status?: string;
+  reject_reason?: string;
 }
 
 interface GenerateResult {
@@ -40,38 +47,74 @@ const LEVEL_COLORS: Record<string, string> = {
   A: 'bg-blue-100 text-blue-800',
 };
 
+const STATUS_COLORS: Record<string, string> = {
+  pending: 'bg-yellow-100 text-yellow-800',
+  published: 'bg-green-100 text-green-800',
+  rejected: 'bg-red-100 text-red-800',
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  pending: '待审核',
+  published: '已发布',
+  rejected: '已拒绝',
+};
+
+type TabType = 'all' | 'pending' | 'published' | 'rejected';
+
 export default function AdminPage() {
   const [authenticated, setAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
   const [news, setNews] = useState<NewsItem[]>([]);
+  const [pendingNews, setPendingNews] = useState<NewsItem[]>([]);
+  const [pendingCount, setPendingCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [generating, setGenerating] = useState<'collect' | 'daily' | 'weekly' | 'leaderboard' | null>(null);
   const [generateResult, setGenerateResult] = useState<GenerateResult | null>(null);
   const [filterCategory, setFilterCategory] = useState('all');
   const [filterLevel, setFilterLevel] = useState('all');
+  const [activeTab, setActiveTab] = useState<TabType>('all');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [reviewing, setReviewing] = useState(false);
+  const [editingItem, setEditingItem] = useState<NewsItem | null>(null);
+  const [editForm, setEditForm] = useState({ title: '', summary: '', category: '', importanceScore: 0 });
+  const [rejectReasonInput, setRejectReasonInput] = useState('');
 
   const checkAuth = useCallback(async () => {
     try {
       const res = await fetch('/api/admin/verify');
-      if (res.ok) {
-        setAuthenticated(true);
-      }
-    } catch {
-      // not authenticated
-    }
+      if (res.ok) setAuthenticated(true);
+    } catch { /* not authenticated */ }
   }, []);
 
-  useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
+  useEffect(() => { checkAuth(); }, [checkAuth]);
 
   useEffect(() => {
-    if (authenticated) {
-      loadNews();
-    }
+    if (authenticated) { loadNews(); loadPending(); }
   }, [authenticated]);
+
+  const loadNews = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/admin/news');
+      const data = await res.json();
+      if (data.success) {
+        const result = data.data;
+        setNews(Array.isArray(result) ? result : result?.items || []);
+      }
+    } catch (err) { console.error('加载新闻失败:', err); }
+    finally { setLoading(false); }
+  };
+
+  const loadPending = async () => {
+    try {
+      const res = await fetch('/api/admin/news/pending');
+      const data = await res.json();
+      setPendingNews(data.news || []);
+      setPendingCount(data.count || 0);
+    } catch { /* ignore */ }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,15 +126,9 @@ export default function AdminPage() {
         body: JSON.stringify({ password }),
       });
       const data = await res.json();
-      if (data.success) {
-        setAuthenticated(true);
-        setPassword('');
-      } else {
-        setAuthError(data.error || '密码错误');
-      }
-    } catch {
-      setAuthError('登录失败，请重试');
-    }
+      if (data.success) { setAuthenticated(true); setPassword(''); }
+      else { setAuthError(data.error || '密码错误'); }
+    } catch { setAuthError('登录失败，请重试'); }
   };
 
   const handleLogout = async () => {
@@ -100,38 +137,105 @@ export default function AdminPage() {
     setNews([]);
   };
 
-  const loadNews = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch('/api/admin/news');
-      const data = await res.json();
-      if (data.success) {
-        // data.data = { items: NewsItemRow[], total: number }
-        const result = data.data;
-        setNews(Array.isArray(result) ? result : result?.items || []);
-      }
-    } catch (err) {
-      console.error('加载新闻失败:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const deleteNews = async (id: string) => {
-    if (!confirm('确定删除这条新闻？此操作不可恢复。')) return;
+    if (!confirm('确定删除这条新闻？')) return;
     setDeleting(id);
     try {
       const res = await fetch(`/api/admin/news?id=${id}`, { method: 'DELETE' });
       const data = await res.json();
       if (data.success) {
         setNews(prev => prev.filter(n => n.id !== id));
-      } else {
-        alert(data.error || '删除失败');
-      }
-    } catch {
-      alert('删除失败，请重试');
-    } finally {
-      setDeleting(null);
+        setPendingNews(prev => prev.filter(n => n.id !== id));
+        setPendingCount(prev => Math.max(0, prev - 1));
+      } else { alert(data.error || '删除失败'); }
+    } catch { alert('删除失败，请重试'); }
+    finally { setDeleting(null); }
+  };
+
+  const reviewSingle = async (id: string, action: 'approve' | 'reject', reason?: string) => {
+    try {
+      const res = await fetch('/api/admin/news/review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newsId: id, action, reason }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPendingNews(prev => prev.filter(n => n.id !== id));
+        setPendingCount(prev => Math.max(0, prev - 1));
+        setNews(prev => prev.map(n => n.id === id ? { ...n, status: action === 'approve' ? 'published' : 'rejected' } : n));
+      } else { alert(data.error || '审核失败'); }
+    } catch { alert('审核失败，请重试'); }
+  };
+
+  const batchReview = async (action: 'approve' | 'reject') => {
+    if (selectedIds.size === 0) return;
+    const reason = action === 'reject' ? rejectReasonInput : undefined;
+    setReviewing(true);
+    try {
+      const res = await fetch('/api/admin/news/batch-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newsIds: Array.from(selectedIds), action, reason }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPendingNews(prev => prev.filter(n => !selectedIds.has(n.id)));
+        setPendingCount(prev => Math.max(0, prev - selectedIds.size));
+        setSelectedIds(new Set());
+        setRejectReasonInput('');
+        await loadNews();
+      } else { alert(data.error || '批量审核失败'); }
+    } catch { alert('批量审核失败，请重试'); }
+    finally { setReviewing(false); }
+  };
+
+  const saveEdit = async () => {
+    if (!editingItem) return;
+    try {
+      const res = await fetch(`/api/admin/news/${editingItem.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: editForm.title,
+          summary: editForm.summary,
+          category: editForm.category,
+          importance_score: editForm.importanceScore,
+          importance_level: editForm.importanceScore >= 35 ? 'SSS' : editForm.importanceScore >= 25 ? 'SS' : editForm.importanceScore >= 15 ? 'S' : 'A',
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setEditingItem(null);
+        await loadNews();
+        await loadPending();
+      } else { alert(data.error || '编辑失败'); }
+    } catch { alert('编辑失败，请重试'); }
+  };
+
+  const openEdit = (item: NewsItem) => {
+    setEditingItem(item);
+    setEditForm({
+      title: item.title,
+      summary: item.summary,
+      category: item.category,
+      importanceScore: item.importance_score || item.importanceScore || 0,
+    });
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === pendingNews.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(pendingNews.map(n => n.id)));
     }
   };
 
@@ -157,19 +261,20 @@ export default function AdminPage() {
         error: data.error,
         newsCount: data.newsCount || data.data?.newsCount,
       });
-      if (type === 'collect' || type === 'daily') {
-        await loadNews();
-      }
-    } catch (err) {
-      setGenerateResult({ success: false, error: '请求失败，请重试' });
-    } finally {
-      setGenerating(null);
-    }
+      await loadNews();
+      await loadPending();
+    } catch { setGenerateResult({ success: false, error: '请求失败，请重试' }); }
+    finally { setGenerating(null); }
   };
+
+  const getScore = (n: NewsItem) => n.importance_score ?? n.importanceScore ?? 0;
+  const getLevel = (n: NewsItem) => n.importance_level ?? n.importanceLevel ?? 'A';
+  const getSource = (n: NewsItem) => n.source_name ?? n.source ?? '未知';
 
   const filteredNews = news.filter(n => {
     if (filterCategory !== 'all' && n.category !== filterCategory) return false;
-    if (filterLevel !== 'all' && n.importanceLevel !== filterLevel) return false;
+    if (filterLevel !== 'all' && getLevel(n) !== filterLevel) return false;
+    if (activeTab !== 'all' && (n.status || 'published') !== activeTab) return false;
     return true;
   });
 
@@ -191,15 +296,8 @@ export default function AdminPage() {
                 className="w-full px-4 py-3 rounded-md border border-border bg-muted text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/30 mb-4"
                 autoFocus
               />
-              {authError && (
-                <p className="text-destructive text-sm mb-4">{authError}</p>
-              )}
-              <button
-                type="submit"
-                className="w-full py-3 bg-primary text-primary-foreground rounded-md font-medium hover:bg-primary/90 transition-colors"
-              >
-                登录
-              </button>
+              {authError && <p className="text-destructive text-sm mb-4">{authError}</p>}
+              <button type="submit" className="w-full py-3 bg-primary text-primary-foreground rounded-md font-medium hover:bg-primary/90 transition-colors">登录</button>
             </form>
           </div>
         </div>
@@ -216,46 +314,25 @@ export default function AdminPage() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-2xl font-bold text-foreground">管理后台</h1>
-            <p className="text-muted-foreground text-sm mt-1">管理新闻数据、手动触发内容生成</p>
+            <p className="text-muted-foreground text-sm mt-1">管理新闻数据、审核资讯、手动触发内容生成</p>
           </div>
-          <button
-            onClick={handleLogout}
-            className="px-4 py-2 text-sm border border-border rounded-md text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
-          >
-            退出登录
-          </button>
+          <button onClick={handleLogout} className="px-4 py-2 text-sm border border-border rounded-md text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors">退出登录</button>
         </div>
 
         {/* Generate actions */}
         <div className="bg-card rounded-lg border border-border p-6 mb-8">
           <h2 className="text-lg font-semibold text-foreground mb-4">手动触发生成</h2>
           <div className="flex flex-wrap gap-3">
-            <button
-              onClick={() => triggerGenerate('collect')}
-              disabled={generating !== null}
-              className="px-5 py-2.5 bg-primary text-primary-foreground rounded-md font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
+            <button onClick={() => triggerGenerate('collect')} disabled={generating !== null} className="px-5 py-2.5 bg-primary text-primary-foreground rounded-md font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
               {generating === 'collect' ? '收集中...' : '收集资讯'}
             </button>
-            <button
-              onClick={() => triggerGenerate('daily')}
-              disabled={generating !== null}
-              className="px-5 py-2.5 bg-muted text-foreground rounded-md font-medium hover:bg-muted/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
+            <button onClick={() => triggerGenerate('daily')} disabled={generating !== null} className="px-5 py-2.5 bg-muted text-foreground rounded-md font-medium hover:bg-muted/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
               {generating === 'daily' ? '生成中...' : '生成日报'}
             </button>
-            <button
-              onClick={() => triggerGenerate('weekly')}
-              disabled={generating !== null}
-              className="px-5 py-2.5 bg-muted text-foreground rounded-md font-medium hover:bg-muted/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
+            <button onClick={() => triggerGenerate('weekly')} disabled={generating !== null} className="px-5 py-2.5 bg-muted text-foreground rounded-md font-medium hover:bg-muted/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
               {generating === 'weekly' ? '生成中...' : '生成周报'}
             </button>
-            <button
-              onClick={() => triggerGenerate('leaderboard')}
-              disabled={generating !== null}
-              className="px-5 py-2.5 bg-muted text-foreground rounded-md font-medium hover:bg-muted/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
+            <button onClick={() => triggerGenerate('leaderboard')} disabled={generating !== null} className="px-5 py-2.5 bg-muted text-foreground rounded-md font-medium hover:bg-muted/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
               {generating === 'leaderboard' ? '更新中...' : '更新排行榜'}
             </button>
           </div>
@@ -266,112 +343,175 @@ export default function AdminPage() {
                 : `操作失败: ${generateResult.error || '未知错误'}`}
             </div>
           )}
-          <p className="text-muted-foreground text-xs mt-3">
-            提示: 「收集资讯」仅搜索和入库新闻，不生成日报；「生成日报」会在已有新闻基础上生成AI日报文章。收集需要1-3分钟。
-          </p>
+          <p className="text-muted-foreground text-xs mt-3">提示: 「收集资讯」仅搜索和入库新闻，不生成日报；「生成日报」会自动发布pending新闻并生成AI日报文章。</p>
         </div>
 
-        {/* News management */}
+        {/* Tabs */}
         <div className="bg-card rounded-lg border border-border p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-foreground">
-              新闻管理
-              <span className="text-muted-foreground font-normal text-sm ml-2">
-                共 {filteredNews.length} 条
-                {filterCategory !== 'all' || filterLevel !== 'all' ? ' (已筛选)' : ''}
-              </span>
-            </h2>
-            <button
-              onClick={loadNews}
-              disabled={loading}
-              className="px-3 py-1.5 text-sm border border-border rounded-md text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-            >
-              {loading ? '加载中...' : '刷新'}
-            </button>
+          <div className="flex items-center gap-4 mb-4 border-b border-border pb-3">
+            {(['all', 'pending', 'published', 'rejected'] as TabType[]).map(tab => (
+              <button
+                key={tab}
+                onClick={() => { setActiveTab(tab); setSelectedIds(new Set()); }}
+                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${activeTab === tab ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
+              >
+                {tab === 'all' ? '全部' : STATUS_LABELS[tab] || tab}
+                {tab === 'pending' && pendingCount > 0 && (
+                  <span className="ml-1.5 inline-flex items-center justify-center w-5 h-5 text-xs bg-red-500 text-white rounded-full">{pendingCount}</span>
+                )}
+              </button>
+            ))}
           </div>
+
+          {/* Pending batch actions */}
+          {activeTab === 'pending' && pendingNews.length > 0 && (
+            <div className="flex items-center gap-3 mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input type="checkbox" checked={selectedIds.size === pendingNews.length} onChange={toggleSelectAll} className="rounded" />
+                全选 ({selectedIds.size}/{pendingNews.length})
+              </label>
+              <button
+                onClick={() => batchReview('approve')}
+                disabled={selectedIds.size === 0 || reviewing}
+                className="px-3 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                批量通过
+              </button>
+              <button
+                onClick={() => batchReview('reject')}
+                disabled={selectedIds.size === 0 || reviewing}
+                className="px-3 py-1.5 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                批量拒绝
+              </button>
+              <input
+                type="text"
+                value={rejectReasonInput}
+                onChange={e => setRejectReasonInput(e.target.value)}
+                placeholder="拒稿理由（可选）"
+                className="flex-1 px-3 py-1.5 text-sm border border-border rounded bg-white"
+              />
+            </div>
+          )}
 
           {/* Filters */}
           <div className="flex gap-3 mb-4">
-            <select
-              value={filterCategory}
-              onChange={e => setFilterCategory(e.target.value)}
-              className="px-3 py-1.5 text-sm border border-border rounded-md bg-muted text-foreground"
-            >
+            <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} className="px-3 py-1.5 text-sm border border-border rounded-md bg-muted text-foreground">
               <option value="all">全部分类</option>
               {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
                 <option key={key} value={key}>{label}</option>
               ))}
             </select>
-            <select
-              value={filterLevel}
-              onChange={e => setFilterLevel(e.target.value)}
-              className="px-3 py-1.5 text-sm border border-border rounded-md bg-muted text-foreground"
-            >
+            <select value={filterLevel} onChange={e => setFilterLevel(e.target.value)} className="px-3 py-1.5 text-sm border border-border rounded-md bg-muted text-foreground">
               <option value="all">全部级别</option>
               <option value="SSS">SSS</option>
               <option value="SS">SS</option>
               <option value="S">S</option>
               <option value="A">A</option>
             </select>
+            <button onClick={() => { loadNews(); loadPending(); }} disabled={loading} className="px-3 py-1.5 text-sm border border-border rounded-md text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50">
+              {loading ? '加载中...' : '刷新'}
+            </button>
           </div>
 
           {/* News list */}
           {loading ? (
             <div className="text-center py-12 text-muted-foreground">加载中...</div>
           ) : filteredNews.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">暂无新闻数据</div>
+            <div className="text-center py-12 text-muted-foreground">
+              {activeTab === 'pending' ? '暂无待审核新闻 🎉' : '暂无新闻数据'}
+            </div>
           ) : (
             <div className="space-y-2">
-              {filteredNews.map((item, idx) => (
-                <div
-                  key={item.id}
-                  className="flex items-start gap-3 p-3 rounded-md border border-border hover:bg-muted/50 transition-colors"
-                >
-                  {/* Rank */}
-                  <span className="text-muted-foreground text-sm font-mono w-6 text-right shrink-0 pt-0.5">
-                    {idx + 1}
-                  </span>
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start gap-2">
-                      <h3 className="text-foreground text-sm font-medium leading-snug line-clamp-2">
-                        {item.title}
-                      </h3>
-                    </div>
-                    <div className="flex items-center gap-2 mt-1 flex-wrap">
-                      <span className={`text-xs px-1.5 py-0.5 rounded ${LEVEL_COLORS[item.importanceLevel] || 'bg-muted text-muted-foreground'}`}>
-                        {item.importanceLevel}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {CATEGORY_LABELS[item.category] || item.category}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        来源: {item.source}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        分数: {item.importanceScore}
-                      </span>
-                      {item.keywords?.length > 0 && (
-                        <span className="text-xs text-muted-foreground">
-                          {item.keywords.slice(0, 3).join('、')}
-                        </span>
+              {filteredNews.map((item, idx) => {
+                const itemStatus = item.status || 'published';
+                const isSelected = selectedIds.has(item.id);
+                return (
+                  <div key={item.id} className={`flex items-start gap-3 p-3 rounded-md border transition-colors ${isSelected ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/50'}`}>
+                    {/* Checkbox for pending */}
+                    {activeTab === 'pending' && (
+                      <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(item.id)} className="mt-1 rounded" />
+                    )}
+                    {/* Rank */}
+                    <span className="text-muted-foreground text-sm font-mono w-6 text-right shrink-0 pt-0.5">{idx + 1}</span>
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start gap-2">
+                        <h3 className="text-foreground text-sm font-medium leading-snug line-clamp-2">{item.title}</h3>
+                      </div>
+                      {item.summary && (
+                        <p className="text-muted-foreground text-xs mt-1 line-clamp-2">{item.summary}</p>
                       )}
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${LEVEL_COLORS[getLevel(item)] || 'bg-muted text-muted-foreground'}`}>
+                          {getLevel(item)}
+                        </span>
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${STATUS_COLORS[itemStatus] || 'bg-muted text-muted-foreground'}`}>
+                          {STATUS_LABELS[itemStatus] || itemStatus}
+                        </span>
+                        <span className="text-xs text-muted-foreground">{CATEGORY_LABELS[item.category] || item.category}</span>
+                        <span className="text-xs text-muted-foreground">来源: {getSource(item)}</span>
+                        <span className="text-xs text-muted-foreground">分数: {getScore(item)}</span>
+                        {item.reject_reason && (
+                          <span className="text-xs text-red-600">拒稿: {item.reject_reason}</span>
+                        )}
+                      </div>
+                    </div>
+                    {/* Actions */}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {itemStatus === 'pending' && (
+                        <>
+                          <button onClick={() => reviewSingle(item.id, 'approve')} className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors">通过</button>
+                          <button onClick={() => reviewSingle(item.id, 'reject')} className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition-colors">拒绝</button>
+                        </>
+                      )}
+                      <button onClick={() => openEdit(item)} className="px-2 py-1 text-xs border border-border text-muted-foreground rounded hover:text-foreground hover:border-foreground/30 transition-colors">编辑</button>
+                      <button onClick={() => deleteNews(item.id)} disabled={deleting === item.id} className="px-2 py-1 text-xs border border-destructive/30 text-destructive rounded hover:bg-destructive/10 transition-colors disabled:opacity-50">
+                        {deleting === item.id ? '...' : '删除'}
+                      </button>
                     </div>
                   </div>
-                  {/* Delete button */}
-                  <button
-                    onClick={() => deleteNews(item.id)}
-                    disabled={deleting === item.id}
-                    className="px-3 py-1 text-xs border border-destructive/30 text-destructive rounded hover:bg-destructive/10 transition-colors disabled:opacity-50 shrink-0"
-                  >
-                    {deleting === item.id ? '删除中...' : '删除'}
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
       </div>
+
+      {/* Edit modal */}
+      {editingItem && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setEditingItem(null)}>
+          <div className="bg-card rounded-lg border border-border p-6 max-w-lg w-full" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-foreground mb-4">编辑新闻</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm text-muted-foreground mb-1 block">标题</label>
+                <input type="text" value={editForm.title} onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))} className="w-full px-3 py-2 text-sm border border-border rounded-md bg-muted text-foreground" />
+              </div>
+              <div>
+                <label className="text-sm text-muted-foreground mb-1 block">摘要</label>
+                <textarea value={editForm.summary} onChange={e => setEditForm(f => ({ ...f, summary: e.target.value }))} rows={4} className="w-full px-3 py-2 text-sm border border-border rounded-md bg-muted text-foreground resize-none" />
+              </div>
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <label className="text-sm text-muted-foreground mb-1 block">分类</label>
+                  <select value={editForm.category} onChange={e => setEditForm(f => ({ ...f, category: e.target.value }))} className="w-full px-3 py-2 text-sm border border-border rounded-md bg-muted text-foreground">
+                    {Object.entries(CATEGORY_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                  </select>
+                </div>
+                <div className="flex-1">
+                  <label className="text-sm text-muted-foreground mb-1 block">分数</label>
+                  <input type="number" value={editForm.importanceScore} onChange={e => setEditForm(f => ({ ...f, importanceScore: Number(e.target.value) }))} className="w-full px-3 py-2 text-sm border border-border rounded-md bg-muted text-foreground" />
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button onClick={() => setEditingItem(null)} className="px-4 py-2 text-sm border border-border rounded-md text-muted-foreground hover:text-foreground">取消</button>
+              <button onClick={saveEdit} className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90">保存</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
