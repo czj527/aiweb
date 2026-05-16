@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, serial, varchar, timestamp, integer, text, boolean, jsonb, index, numeric } from "drizzle-orm/pg-core";
+import { pgTable, serial, varchar, timestamp, integer, text, boolean, jsonb, index, numeric, uuid } from "drizzle-orm/pg-core";
 
 // 系统表 - 必须保留
 export const healthCheck = pgTable("health_check", {
@@ -155,8 +155,8 @@ export const generationLogs = pgTable(
 export const reviewLogs = pgTable(
   "review_logs",
   {
-    id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
-    news_id: varchar("news_id", { length: 36 }).notNull().references(() => newsItems.id, { onDelete: "cascade" }),
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    news_id: uuid("news_id").notNull().references(() => newsItems.id, { onDelete: "cascade" }),
     action: varchar("action", { length: 20 }).notNull(), // approve / reject / edit
     previous_status: varchar("previous_status", { length: 20 }),
     new_status: varchar("new_status", { length: 20 }),
