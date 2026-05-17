@@ -126,9 +126,9 @@ function applySourceBoost(news: ProcessedNews[]): ProcessedNews[] {
     const priority = getSourcePriority(n.sourceUrl);
     let boost = 0;
     switch (priority) {
-      case "SSS": boost = 8; break;  // 顶级信源 +8
-      case "SS":  boost = 5; break;  // 重要信源 +5
-      case "S":   boost = 2; break;  // 一般信源 +2
+      case "SSS": boost = 6; break;  // 官方源 +6
+      case "SS":  boost = 4; break;  // 重要厂商 +4
+      case "S":   boost = 2; break;  // 知名媒体 +2
       case "A":   boost = 0; break;  // 社区/学术不加分
       default:    boost = 0; break;  // 未知信源不加分
     }
@@ -136,41 +136,44 @@ function applySourceBoost(news: ProcessedNews[]): ProcessedNews[] {
     return {
       ...n,
       importanceScore: boostedScore,
-      importanceLevel: boostedScore >= 35 ? "SSS" : boostedScore >= 25 ? "SS" : boostedScore >= 15 ? "S" : "A",
+      importanceLevel: boostedScore >= 30 ? "SSS" : boostedScore >= 22 ? "SS" : boostedScore >= 14 ? "S" : "A",
     };
   });
 }
 
 
-/** 主题加分：模型发布/Agent/OpenClaw/模型价格 权重更高 */
+/** 主题加分：高价值主题权重更高 */
 function applyTopicBoost(news: ProcessedNews[]): ProcessedNews[] {
   return news.map(n => {
     let boost = 0;
     // 模型发布和Agent分类加分
-    if (n.category === 'model' || n.category === 'agent') boost += 5;
+    if (n.category === 'model' || n.category === 'agent') boost += 3;
     // MCP/RAG相关加分
     const text = `${n.title} ${n.summary}`.toLowerCase();
-    if (text.includes('mcp') || text.includes('rag') || text.includes('retrieval augmented')) boost += 5;
-    // 模型价格相关加分
-    if (/价格|定价|免费|pricing|price|free tier|api cost|token price|计费/i.test(text)) boost += 3;
+    if (text.includes('mcp') || text.includes('rag') || text.includes('retrieval augmented')) boost += 3;
+    // 模型价格相关加分（直接影响用户）
+    if (/价格|定价|免费|pricing|price|free tier|api cost|token price|计费/i.test(text)) boost += 2;
+    // 开源发布加分
+    if (n.category === 'opensource' && (text.includes('开源') || text.includes('open source') || text.includes('open-source'))) boost += 2;
     const boostedScore = n.importanceScore + boost;
     return {
       ...n,
       importanceScore: boostedScore,
-      importanceLevel: boostedScore >= 35 ? "SSS" : boostedScore >= 25 ? "SS" : boostedScore >= 15 ? "S" : "A",
+      importanceLevel: boostedScore >= 30 ? "SSS" : boostedScore >= 22 ? "SS" : boostedScore >= 14 ? "S" : "A",
     };
   });
 }
 
-// 新闻分类体系（与前端 types.ts 保持一致）
+// 新闻分类体系（对齐橘鸦AI早报8分类）
 export const NEWS_CATEGORIES = [
-  "model",      // 大模型动态
-  "opensource", // 开源项目
-  "product",    // 产品发布
-  "policy",     // 行业政策
-  "research",   // 学术研究
-  "agent",      // Agent
-  "industry",   // 行业动态
+  "model",      // 模型发布：新模型、模型更新、评测榜单
+  "opensource", // 开源项目：开源模型/工具/框架发布
+  "product",    // 产品应用：AI产品/应用发布或重大更新
+  "policy",     // 行业政策：AI政策、法规、行业标准
+  "research",   // 技术与洞察：技术解析、研究报告、学术论文
+  "agent",      // Agent：AI Agent框架/产品/进展
+  "industry",   // 行业动态：融资、收购、人事变动、市场格局
+  "rumor",      // 前瞻与传闻：未确认消息、预告、规划
 ] as const;
 
 export type NewsCategory = (typeof NEWS_CATEGORIES)[number];
@@ -248,101 +251,157 @@ export async function processWithAI(
           {
             role: "system",
             content: `你是一位资深AI行业新闻分析师，正在为「AI Pulse」AI资讯日报筛选和处理新闻。
+对标参考：橘鸦AI早报（https://imjuya.github.io/juya-ai-daily/），你需要达到同等的信息质量。
 
 你的任务是对每条新闻进行深度分析，生成高质量的内容。请严格按以下标准执行：
 
-=== 1. AI相关性判断 ===
+=== 1. AI相关性判断（严格把关） ===
 只有与以下内容直接相关的才标记 isAIRelated=true：
-- AI大模型（GPT、Claude、Gemini、DeepSeek、Qwen、Llama等）的发布、更新、价格变化
-- AI应用/产品（ChatGPT、Copilot、Midjourney等）的新功能或重大更新
-- AI工具/框架（LangChain、LlamaIndex、vLLM等）的发布或更新
-- AI公司融资、收购、战略合作
-- AI政策法规（各国AI监管、标准制定）
-- AI学术突破（新架构、新训练方法、SOTA结果）
-- AI Agent、RAG、多模态等技术方向的重要进展
-以下不算AI相关：通用云计算、区块链、普通软件更新、非AI的硬件产品
+- AI大模型（GPT、Claude、Gemini、DeepSeek、Qwen、Llama、Grok等）的发布、更新、价格变化
+- AI应用/产品（ChatGPT、Copilot、Midjourney、Cursor等）的新功能或重大更新
+- AI开发工具/框架（LangChain、vLLM、Cline、Codex等）的发布或更新
+- AI Agent（Hermes Agent、AutoGPT、Devin等）的进展
+- AI公司融资、收购、战略合作（金额明确的）
+- AI政策法规（各国AI监管、标准制定、合规要求）
+- AI学术突破（新架构、新训练方法、SOTA结果、开源模型）
+- 大模型排行榜变化、基准测试新结果
 
-=== 2. 内容生成（最重要） ===
-摘要（summary）：200-400字的完整新闻正文，不是简单概括。要求：
-- 第一段：核心事实（谁、做了什么、什么时候）
-- 第二段：技术细节或背景分析（为什么重要、技术原理、市场影响）
-- 第三段（可选）：影响评估或后续展望
-- 包含具体数据（版本号、参数量、价格、融资金额等）
-- 使用专业但易懂的语言，面向AI从业者
-- 不要使用"近日"、"最近"等模糊时间词，用具体日期
+以下不算AI相关（标记false，将被过滤）：
+- 通用云计算/区块链/Web3（除非与AI直接结合）
+- 普通软件更新、非AI硬件产品
+- 纯粹的SEO/营销/广告内容
+- 招聘信息、活动报名、课程推广
 
-引用（quote）：从原文中提取1-2句最关键的事实陈述，用引号格式。这是直接引用，不是你总结的。
-例如："GPT-5 will support 1M context window and native multimodal input."
+=== 2. 内容生成（最重要，对齐橘鸦质量标准） ===
 
-=== 3. 分类 ===
-model: 大模型发布/更新/评测（GPT-5、Claude 4、Gemini 2、Qwen3等）
-opensource: 开源模型/工具/框架发布
-product: AI产品/应用发布或重大更新
-policy: AI政策、法规、行业标准
-research: 学术论文、技术突破
-agent: AI Agent框架/产品/进展
-industry: 公司融资、收购、市场动态
+【引用（quote）】——参考橘鸦的blockquote格式：
+从原文中提取1-2句最关键的事实陈述。必须是直接引用或高度还原的原文，不是你自己的总结。
+格式要求：简洁、信息密度高、包含关键数据。
+好的示例：
+  "OpenAI 宣布 GPT-5 将支持 100万 token 上下文窗口，API 价格下调 50%。"
+  "Anthropic 已为全体用户重置五小时及每周速率限制，该调整即时生效。"
+坏的示例（不要这样写）：
+  "OpenAI发布了一些新功能。" ← 太空泛
+  "据报道，该公司最近推出了一个新产品。" ← 没有具体信息
 
-=== 4. 评分体系（四维度，各1-10分） ===
-影响力（impact）：影响范围和深度
-  - 10: 改变行业格局（如GPT-5发布、重大收购）
-  - 7-9: 重要产品发布/更新、大额融资
-  - 4-6: 一般产品更新、技术博客
-  - 1-3: 小众工具、个人观点
-时效性（timeliness）：是否为最新消息
-  - 10: 今天刚发布
-  - 7-9: 1-2天内
-  - 4-6: 3-7天内
-  - 1-3: 超过一周
-独特性（uniqueness）：是否为独家/首次报道
-  - 10: 官方首次发布
-  - 7-9: 独家报道/深度分析
-  - 4-6: 多家媒体报道的同一事件
-  - 1-3: 转载/二手信息
-可靠性（reliability）：信源可信度
-  - 10: 官方博客/官方公告
-  - 7-9: 知名科技媒体
-  - 4-6: 一般媒体/社区
-  - 1-3: 个人博客/未验证消息
+【摘要（summary）】——参考橘鸦的详细正文格式：
+200-400字的完整新闻正文，结构为多段落叙述。要求：
+
+第一段（核心事实）：
+- 谁（具体公司/团队/人物）+ 做了什么 + 什么时候
+- 包含关键数据（版本号、参数量、价格、融资金额等具体数字）
+- 例如："OpenAI 通过其开发者社交账号宣布，已为 Codex 推出一系列更新。"
+
+第二段（技术细节/背景）：
+- 为什么重要、技术原理、与竞品对比
+- 市场背景、用户影响
+- 例如："功能方面，键盘快捷键现可在设置中自定义。性能上，大型仓库中 Git 操作加速约 10 至 50 倍。"
+
+第三段（可选：影响/展望）：
+- 对行业的影响、后续计划、用户反馈
+- 例如："该项目目前仍处于实验阶段，官方强调其语言本身尚未稳定。"
+
+严格禁止：
+- 使用"近日"、"最近"、"据悉"等模糊时间词 → 用具体日期
+- 使用"一些"、"若干"、"部分"等模糊数量词 → 用具体数字
+- 空泛的评价（"意义重大"、"引发关注"）→ 用事实说话
+- 重复标题内容作为摘要 → 摘要必须比标题提供更多信息
+
+=== 3. 分类（对齐橘鸦8分类体系） ===
+model: 模型发布/更新/评测（GPT-5、Claude 4、Gemini 2、Qwen3等新模型发布或重大更新）
+opensource: 开源模型/工具/框架发布或重大版本更新
+product: AI产品/应用发布或重大功能更新（面向终端用户的）
+policy: AI政策、法规、行业标准、合规要求
+research: 技术解析、研究报告、学术论文、技术博客
+agent: AI Agent框架/产品/编排工具/进展
+industry: 公司融资、收购、人事变动、市场格局、商业模式
+rumor: 未确认的传闻、预告、规划、泄露信息
+注意：分类要准确，不要把产品更新归为模型发布，不要把技术博客归为学术研究。
+
+=== 4. 评分体系（四维度，各1-10分，校准标准） ===
+
+影响力（impact）——这个事件影响了多少人/行业：
+  9-10: 改变行业格局（GPT-5发布、千亿美元级收购、国家级AI政策）
+  7-8: 重要产品发布/更新、大额融资(>1亿美元)、主流工具重大更新
+  5-6: 一般产品更新、中小额融资、技术博客
+  3-4: 小众工具发布、细分领域进展
+  1-2: 个人观点、小范围讨论
+
+时效性（timeliness）——消息的新鲜程度：
+  9-10: 今天刚发布/宣布
+  7-8: 1-2天内
+  5-6: 3-5天内
+  3-4: 一周左右
+  1-2: 超过一周
+
+独特性（uniqueness）——信息的稀缺程度：
+  9-10: 官方首次发布/独家报道
+  7-8: 少数媒体报道、独家分析
+  5-6: 多家媒体报道的同一事件
+  3-4: 转述/二手信息
+  1-3: 纯粹转载、无新增信息
+
+可靠性（reliability）——信源的可信度：
+  9-10: 官方博客/官方公告/官方社交媒体
+  7-8: 知名科技媒体（TechCrunch、The Verge、机器之心等）
+  5-6: 一般媒体、知名社区（Reddit、HackerNews）
+  3-4: 个人博客、自媒体
+  1-2: 匿名来源、无法验证
 
 importanceScore = 四个维度之和（4-40）
-importanceLevel: >=35 SSS, >=25 SS, >=15 S, <15 A
+importanceLevel映射：>=30 SSS, >=22 SS, >=14 S, <14 A
 
 === 5. 要闻标记（isBreaking） ===
-只有最重要的1-3条新闻标记 isBreaking=true。标准：
-- 重大模型发布（新旗舰模型）
-- 重大融资（>1亿美元）
-- 重大政策变化
-- 行业格局变化（收购、合并）
+只有最重要的1-3条新闻标记 isBreaking=true。严格标准：
+- 旗舰级模型首次发布（如GPT-5、Claude 4首发）
+- 超大额融资（>5亿美元）
+- 重大政策变化（国家级AI立法）
+- 行业格局剧变（巨头收购、核心团队出走）
+- 开源界里程碑事件（如Llama开源）
+不要滥用此标记，大多数新闻应该是false。
 
 === 6. 关键词 ===
-提取3-5个关键词，用于归类和搜索。优先使用：模型名称、公司名、技术术语。
+提取3-5个关键词，用于归类和搜索。优先使用：
+- 模型名称（GPT-5、Claude 4、DeepSeek V4）
+- 公司名（OpenAI、Anthropic、Google）
+- 技术术语（Agent、RAG、MoE、RLHF）
+- 产品名（ChatGPT、Copilot、Cursor）
 
-=== 7. 内容质量审核 ===
-以下情况应被低分或过滤：
-- 内容空泛，没有具体数据或事件
-- 纯粹的广告/推广/招聘信息
-- 过时的新闻（超过7天）
-- 无法验证的传闻（除非标记为传闻）
+=== 7. 内容质量审核（严格过滤） ===
+以下情况应被低分（importanceScore < 8）或直接过滤：
+- 内容空泛，没有具体数据或事件，只有泛泛而谈
+- 纯粹的广告/推广/招聘信息/课程推广
+- 过时的新闻（超过7天且无重大影响）
+- 无法验证的传闻（除非标记为rumor分类）
+- 重复报道同一事件（保留信息最丰富的版本）
+- 低质量来源（个人博客转发、无来源的二手信息）
+
+=== 8. 内容真实性检查 ===
+- 不要编造不存在的数据、版本号、融资金额
+- 如果原文没有提供具体数字，不要在摘要中捏造
+- 如果信息来源不明确，降低reliability评分
+- 对于传闻类信息，summary中应注明"据报道"/"消息称"
 
 返回JSON数组，每个元素格式:
 {
-  "title": "原标题",
-  "summary": "详细正文200-400字",
+  "title": "具体、信息丰富的标题（不要修改原标题，除非原标题太模糊）",
+  "summary": "详细正文200-400字，多段落叙述",
   "quote": "引用原文1-2句核心事实",
   "sourceName": "来源名称",
   "sourceUrl": "原URL",
-  "category": "model|opensource|product|policy|research|agent|industry",
+  "category": "model|opensource|product|policy|research|agent|industry|rumor",
   "importanceScore": 总分(4-40),
   "importanceLevel": "SSS|SS|S|A",
-  "keywords": ["关键词1", "关键词2"],
+  "keywords": ["关键词1", "关键词2", "关键词3"],
   "isAIRelated": true/false,
   "isBreaking": true/false,
   "publishedAt": "YYYY-MM-DD"
 }
 
-注意：与AI无关的新闻设isAIRelated=false，这些将被过滤掉。
-注意：摘要必须是完整的新闻正文，不是一句话概括。`,
+最终过滤规则：
+- isAIRelated=false 的条目将被系统自动过滤
+- importanceScore < 8 的条目将被系统自动过滤
+- 请确保你的评分准确，不要虚高（大部分新闻应在14-25分之间）`,
           },
           {
             role: "user",
@@ -379,30 +438,31 @@ importanceLevel: >=35 SSS, >=25 SS, >=15 S, <15 A
 }
 
 /**
- * 内容质量审核：多维度质量评估
- * 过滤空泛标题党、摘要过短、无具体信息、模板化内容
+ * 内容质量审核：多维度质量评估（对齐橘鸦AI早报标准）
+ * 过滤：空泛标题党、摘要过短、无具体信息、模板化内容、AI幻觉、模糊用语
  */
 function contentQualityCheck(news: ProcessedNews[]): ProcessedNews[] {
   return news.filter((n) => {
     const summary = n.summary?.trim() || "";
     const title = n.title?.trim() || "";
+    const quote = n.quote?.trim() || "";
 
-    // 1. 摘要太短（<50字）说明无实质内容
-    if (summary.length < 50) return false;
+    // 1. 摘要太短（<80字）说明无实质内容（提高阈值，从50→80）
+    if (summary.length < 80) return false;
 
-    // 2. 空值标记
-    if (/暂无|无相关|未提供|无内容|暂无数据|no data|not available/i.test(summary)) return false;
+    // 2. 空值/占位标记
+    if (/暂无|无相关|未提供|无内容|暂无数据|no data|not available|待补充|TBD/i.test(summary)) return false;
 
-    // 3. 垃圾内容过滤（广告/抽奖/招聘/推广）
-    const spamPatterns = /抽奖|红包|免费领取|点击领取|限时秒杀|注册送|招聘|求职|加盟|代理|赌博|代写|刷单/i;
+    // 3. 垃圾内容过滤（广告/抽奖/招聘/推广/课程/代理）
+    const spamPatterns = /抽奖|红包|免费领取|点击领取|限时秒杀|注册送|招聘|求职|加盟|代理|赌博|代写|刷单|培训班|训练营|报名|优惠券|折扣码/i;
     if (spamPatterns.test(title) || spamPatterns.test(summary)) return false;
 
     // 4. 纯观点/评论类（没有具体事件）
-    const opinionOnly = /^(我觉得|我认为|个人看法|浅谈|杂谈|随笔)/;
+    const opinionOnly = /^(我觉得|我认为|个人看法|浅谈|杂谈|随笔|闲聊|我的看法)/;
     if (opinionOnly.test(title)) return false;
 
     // 5. 摘要中必须包含至少一个具体数据或实体名称
-    const hasSubstance = /\d|[A-Z][a-z]+\s?\d|GPT|Claude|Gemini|DeepSeek|Qwen|Llama|OpenAI|Google|Microsoft|Meta|Anthropic|融资|发布|更新|开源/i;
+    const hasSubstance = /\d|[A-Z][a-z]+\s?\d|GPT|Claude|Gemini|DeepSeek|Qwen|Llama|Grok|OpenAI|Google|Microsoft|Meta|Anthropic|融资|发布|更新|开源|API|GPU|TPU|token|模型|参数|benchmark/i;
     if (!hasSubstance.test(summary)) return false;
 
     // 6. 标题-摘要重叠度过高检测（摘要只是标题的扩写，没有新信息）
@@ -414,8 +474,40 @@ function contentQualityCheck(news: ProcessedNews[]): ProcessedNews[] {
       if (charOverlapRatio > 0.85) return false;
     }
 
-    // 7. 纯英文内容如果太短（<80字符），可能只是RSS的description片段
-    if (!/[\u4e00-\u9fff]/.test(summary) && summary.length < 80) return false;
+    // 7. 纯英文内容如果太短（<100字符），可能只是RSS的description片段
+    if (!/[\u4e00-\u9fff]/.test(summary) && summary.length < 100) return false;
+
+    // === 新增：橘鸦级质量检查 ===
+
+    // 8. 模糊用语检测（"近日"、"最近"、"据悉"、"一些"等）
+    const vaguePatterns = /近日|最近|据悉|据了解|有消息称|部分|一些|若干|相关|业内人士|知情人士透露/;
+    const vagueCount = (summary.match(new RegExp(vaguePatterns.source, "g")) || []).length;
+    // 超过3个模糊用语说明内容质量低
+    if (vagueCount > 3) return false;
+
+    // 9. AI幻觉风险检测（捏造数据的模式）
+    const hallucinationPatterns = /预计将达到|据估计约|或将突破|有望超过|预计将实现/;
+    const hasSuspiciousClaim = hallucinationPatterns.test(summary);
+    // 如果有可疑声明但quote为空，可能是AI编造的
+    if (hasSuspiciousClaim && !quote) {
+      // 不直接过滤，但这些条目评分会较低
+    }
+
+    // 10. 内容丰富度检查（必须有具体数字或专有名词）
+    const specificData = /\d+[万亿]|\d+\.\d+|\$\d+|\d+%|\d+亿|\d+万|v\d+|版本|Version/i;
+    const hasSpecificData = specificData.test(summary);
+    const properNouns = /[A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+)?(?:\s(?:AI|LLM|API|SDK|OS))?/;
+    const hasProperNouns = properNouns.test(summary);
+    // 摘要既没有具体数据也没有专有名词，质量存疑
+    if (!hasSpecificData && !hasProperNouns && summary.length < 150) return false;
+
+    // 11. 摘要不能只是对标题的简单翻译/改写
+    if (title.length > 5 && summary.length < 150) {
+      const titleWords = new Set(title.toLowerCase().replace(/[^\w\u4e00-\u9fff]/g, "").split(""));
+      const summaryWords = summary.toLowerCase().replace(/[^\w\u4e00-\u9fff]/g, "").split("");
+      const overlapRatio = summaryWords.filter(w => titleWords.has(w)).length / Math.max(summaryWords.length, 1);
+      if (overlapRatio > 0.7) return false; // 太相似，没有新信息
+    }
 
     return true;
   });
@@ -423,7 +515,7 @@ function contentQualityCheck(news: ProcessedNews[]): ProcessedNews[] {
 
 /**
  * 过滤非AI相关和低质量内容
- * 多阶段过滤：AI相关性 → 内容质量 → 分数阈值 → 源加分 → 排序
+ * 多阶段过滤：AI相关性 → 内容质量 → 时效性 → 源加分 → 主题加分 → 分数阈值 → 排序
  */
 export function filterNews(news: ProcessedNews[]): ProcessedNews[] {
   if (news.length === 0) return [];
@@ -435,31 +527,31 @@ export function filterNews(news: ProcessedNews[]): ProcessedNews[] {
     `[Filter] After AI relevancy filter: ${filtered.length}/${news.length}`
   );
 
-  // 阶段2: 内容质量审核
+  // 阶段2: 内容质量审核（11项检查）
   filtered = contentQualityCheck(filtered);
 
   console.log(
     `[Filter] After quality check: ${filtered.length}/${news.length}`
   );
 
-  // 阶段2.5: 24小时时效性过滤
+  // 阶段3: 24小时时效性过滤
   filtered = filtered.filter(n => isWithin24Hours(n.publishedAt));
   console.log(`[Filter] After 24h recency filter: ${filtered.length}/${news.length}`);
 
-  // 阶段3: 应用信息源加分
+  // 阶段4: 应用信息源加分
   const sourceBoosted = applySourceBoost(filtered);
 
-  // 阶段3.5: 应用主题加分（模型发布/Agent/OpenClaw/模型价格 权重更高）
+  // 阶段5: 应用主题加分
   const boosted = applyTopicBoost(sourceBoosted);
 
-  // 阶段4: 过滤低分（<8分即为B级）
+  // 阶段6: 过滤低分（<8分即为B级，过滤掉）
   const scored = boosted.filter((n) => n.importanceScore >= 8);
 
   console.log(
     `[Filter] After score threshold: ${scored.length}/${boosted.length}`
   );
 
-  // 阶段5: 按分数降序排列
+  // 阶段7: 按分数降序排列
   return scored.sort((a, b) => b.importanceScore - a.importanceScore);
 }
 

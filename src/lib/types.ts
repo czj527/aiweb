@@ -1,14 +1,15 @@
-// 新闻分类
-export type NewsCategory = 'model' | 'opensource' | 'product' | 'policy' | 'research' | 'agent' | 'industry';
+// 新闻分类（对齐橘鸦AI早报的8分类体系）
+export type NewsCategory = 'model' | 'opensource' | 'product' | 'policy' | 'research' | 'agent' | 'industry' | 'rumor';
 
 export const categoryConfig: Record<NewsCategory, { label: string; icon: string }> = {
-  model: { label: '大模型动态', icon: 'brain' },
+  model: { label: '模型发布', icon: 'brain' },
   opensource: { label: '开源项目', icon: 'git-branch' },
-  product: { label: '产品发布', icon: 'rocket' },
+  product: { label: '产品应用', icon: 'rocket' },
   policy: { label: '行业政策', icon: 'landmark' },
-  research: { label: '学术研究', icon: 'graduation-cap' },
+  research: { label: '技术与洞察', icon: 'graduation-cap' },
   agent: { label: 'Agent', icon: 'bot' },
   industry: { label: '行业动态', icon: 'building' },
+  rumor: { label: '前瞻与传闻', icon: 'eye' },
 };
 
 // 新闻条目

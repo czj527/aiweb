@@ -141,6 +141,41 @@ export const RSS_FEEDS: RSSFeedConfig[] = [
     category: "media",
     lang: "zh",
   },
+  {
+    name: "新智元",
+    url: "https://zhidx.com/feed",
+    priority: "S",
+    category: "media",
+    lang: "zh",
+  },
+  {
+    name: "36kr AI",
+    url: "https://36kr.com/feed",
+    priority: "S",
+    category: "media",
+    lang: "zh",
+  },
+  {
+    name: "Hugging Face Papers",
+    url: "https://huggingface.co/papers/rss",
+    priority: "SS",
+    category: "academic",
+    lang: "en",
+  },
+  {
+    name: "Cohere Blog",
+    url: "https://cohere.com/blog/rss.xml",
+    priority: "A",
+    category: "official",
+    lang: "en",
+  },
+  {
+    name: "AWS AI Blog",
+    url: "https://aws.amazon.com/blogs/machine-learning/feed/",
+    priority: "S",
+    category: "official",
+    lang: "en",
+  },
 
   // === A级：社区与学术 ===
   {
@@ -164,10 +199,17 @@ export const RSS_FEEDS: RSSFeedConfig[] = [
     category: "community",
     lang: "en",
   },
+  {
+    name: "Papers With Code",
+    url: "https://paperswithcode.com/latest.rss",
+    priority: "A",
+    category: "academic",
+    lang: "en",
+  },
 ];
 
 /** 解析后的RSS条目 */
-interface ParsedRSSItem {
+interface _ParsedRSSItem {
   title: string;
   link: string;
   contentSnippet: string;
