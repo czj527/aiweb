@@ -194,6 +194,83 @@ export interface ProcessedNews {
   isBreaking: boolean;     // 是否为当日要闻（最重要的1-3条）
 }
 
+// ============================================================
+// 橘鸦AI早报 → ProcessedNews 直接转换（跳过AI处理）
+// ============================================================
+
+/** 橘鸦分类名 → NewsCategory 映射 */
+const JUYA_CATEGORY_MAP: Record<string, NewsCategory> = {
+  "要闻": "model",
+  "模型发布": "model",
+  "开发生态": "opensource",
+  "产品应用": "product",
+  "技术与洞察": "research",
+  "行业动态": "industry",
+  "政策与治理": "policy",
+  "前瞻与传闻": "rumor",
+  // 兼容旧分类名
+  "大模型动态": "model",
+  "产品发布": "product",
+  "学术研究": "research",
+  "Agent 生态": "agent",
+};
+
+/**
+ * 将橘鸦RSS解析出的SearchResult直接转为ProcessedNews
+ * 橘鸦内容已经过人工+AI审核，跳过我们的AI处理流程
+ * 给予较高的基础分（已审核内容），同时保留评分排序能力
+ */
+export function convertJuyaResults(results: SearchResult[]): ProcessedNews[] {
+  return results.map((r) => {
+    // 映射分类
+    const juyaCat = r._juyaCategory || "";
+    const category = JUYA_CATEGORY_MAP[juyaCat] || "industry";
+
+    // 基础分25（已审核内容默认SS级），再根据内容微调
+    let baseScore = 25;
+
+    // 模型发布和Agent相关给更高基础分
+    if (category === "model" || category === "agent") baseScore += 3;
+    // 开源项目
+    if (category === "opensource") baseScore += 2;
+
+    // 摘要：如果fullText足够长就用，否则用quote
+    const summary = r.snippet.length > 100 ? r.snippet : r._juyaQuote || r.snippet;
+    const quote = r._juyaQuote || "";
+
+    return {
+      title: r.title,
+      summary,
+      quote,
+      sourceName: "橘鸦AI早报",
+      sourceUrl: r.url,
+      category,
+      importanceScore: baseScore,
+      importanceLevel: baseScore >= 30 ? "SSS" : baseScore >= 22 ? "SS" : "S",
+      keywords: extractKeywordsFromText(`${r.title} ${summary}`),
+      isAIRelated: true, // 橘鸦内容已确认AI相关
+      publishedAt: r.date ? new Date(r.date).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
+      isBreaking: false,
+    };
+  });
+}
+
+/** 从文本中简单提取关键词 */
+function extractKeywordsFromText(text: string): string[] {
+  const patterns = [
+    /GPT-\d[\w.]*/g, /Claude\s?\d[\w.]*/g, /Gemini\s?[\w.]+/g,
+    /DeepSeek\s?[\w.]+/g, /Qwen\s?[\w.]+/g, /Llama\s?[\w.]+/g, /Grok\s?[\w.]+/g,
+    /OpenAI|Anthropic|Google|Microsoft|Meta|NVIDIA|Mistral|xAI|Vercel/g,
+    /Agent|MCP|RAG|MoE|RLHF|SFT|GRPO|LoRA/gi,
+  ];
+  const found = new Set<string>();
+  for (const p of patterns) {
+    const matches = text.match(p);
+    if (matches) matches.forEach(m => found.add(m.trim()));
+  }
+  return Array.from(found).slice(0, 5);
+}
+
 /**
  * 三层去重
  */

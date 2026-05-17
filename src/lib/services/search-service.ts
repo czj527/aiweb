@@ -74,6 +74,10 @@ export interface SearchResult {
   url: string;
   source: string;
   date: string;
+  // 橘鸦AI早报专用字段（可选）
+  _juyaCategory?: string;
+  _juyaQuote?: string;
+  _juyaOrder?: number;
 }
 
 // SearXNG 公共实例列表（按可靠性排序）

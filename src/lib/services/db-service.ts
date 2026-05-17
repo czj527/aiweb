@@ -84,8 +84,6 @@ export async function upsertNewsItem(news: ProcessedNews): Promise<string> {
     importance_level: news.importanceLevel,
     keywords: news.keywords,
     is_ai_related: news.isAIRelated,
-    quote: news.quote || "",
-    is_breaking: news.isBreaking || false,
     published_at: normalizePublishedAt(news.publishedAt),
   });
 
