@@ -20,6 +20,8 @@ CREATE TABLE IF NOT EXISTS news_items (
   keywords JSONB DEFAULT '[]'::jsonb,
   published_at TIMESTAMPTZ,
   is_ai_related BOOLEAN NOT NULL DEFAULT true,
+  quote TEXT DEFAULT '',
+  is_breaking BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
