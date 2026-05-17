@@ -1,53 +1,45 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import Link from 'next/link';
 import { Navbar } from '@/components/navbar';
 import {
   Bot,
   Send,
-  ArrowLeft,
-  Newspaper,
-  CheckCircle,
-  Clock,
-  Calendar,
   Loader2,
-  AlertCircle,
   CheckCircle2,
   XCircle,
+  Newspaper,
+  Calendar,
   Terminal,
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────
 
-interface Stats {
-  totalNews: number;
-  publishedNews: number;
-  pendingNews: number;
-  totalDailyReports: number;
-  totalWeeklyReports: number;
-}
-
-interface GenerationLog {
-  id: string;
-  type: string;
-  target_date: string;
-  status: string;
-  discovered_count: number;
-  after_dedup_count: number;
-  after_filter_count: number;
-  error_message?: string;
-  started_at: string;
-  completed_at?: string;
-}
-
-interface RecentNews {
+interface NewsItem {
   id: string;
   title: string;
-  category: string;
-  importance_level: string;
+  summary: string;
   source_name: string;
+  source?: string;
+  sourceUrl: string;
+  source_url: string;
+  category: string;
+  importance_score: number;
+  importanceScore: number;
+  importance_level: string;
+  importanceLevel: string;
+  keywords: string[];
   published_at: string;
+  publishedAt: string;
+  status?: string;
+  reject_reason?: string;
+}
+
+interface GenerateResult {
+  success: boolean;
+  message?: string;
+  error?: string;
+  newsCount?: number;
 }
 
 interface ChatMessage {
@@ -57,7 +49,7 @@ interface ChatMessage {
   isLoading?: boolean;
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────
+// ─── Constants ───────────────────────────────────────────────────────
 
 const CATEGORY_LABELS: Record<string, string> = {
   model: '大模型',
@@ -67,26 +59,30 @@ const CATEGORY_LABELS: Record<string, string> = {
   policy: '政策',
   research: '研究',
   industry: '行业',
+  rumor: '前瞻与传闻',
 };
 
-const LOG_TYPE_LABELS: Record<string, string> = {
-  collect: '资讯收集',
-  daily: '日报生成',
-  weekly: '周报生成',
+const LEVEL_COLORS: Record<string, string> = {
+  SSS: 'bg-red-100 text-red-800',
+  SS: 'bg-orange-100 text-orange-800',
+  S: 'bg-yellow-100 text-yellow-800',
+  A: 'bg-blue-100 text-blue-800',
 };
 
-const LOG_STATUS_LABELS: Record<string, string> = {
-  running: '运行中',
-  success: '成功',
-  failed: '失败',
+const STATUS_COLORS: Record<string, string> = {
+  pending: 'bg-yellow-100 text-yellow-800',
+  published: 'bg-green-100 text-green-800',
+  rejected: 'bg-red-100 text-red-800',
 };
 
-function formatTime(dateStr?: string) {
-  if (!dateStr) return '-';
-  const d = new Date(dateStr);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
+const STATUS_LABELS: Record<string, string> = {
+  pending: '待审核',
+  published: '已发布',
+  rejected: '已拒绝',
+};
+
+type TabType = 'all' | 'pending' | 'published' | 'rejected';
+type MobileTab = 'admin' | 'chat';
 
 // ─── Page Component ──────────────────────────────────────────────────
 
@@ -97,11 +93,25 @@ export default function WorkspacePage() {
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
 
-  // Dashboard state
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [recentLogs, setRecentLogs] = useState<GenerationLog[]>([]);
-  const [recentNews, setRecentNews] = useState<RecentNews[]>([]);
-  const [dashboardLoading, setDashboardLoading] = useState(true);
+  // Mobile tab
+  const [mobileTab, setMobileTab] = useState<MobileTab>('admin');
+
+  // Admin state
+  const [news, setNews] = useState<NewsItem[]>([]);
+  const [pendingNews, setPendingNews] = useState<NewsItem[]>([]);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [generating, setGenerating] = useState<'collect' | 'daily' | 'weekly' | 'leaderboard' | null>(null);
+  const [generateResult, setGenerateResult] = useState<GenerateResult | null>(null);
+  const [filterCategory, setFilterCategory] = useState('all');
+  const [filterLevel, setFilterLevel] = useState('all');
+  const [activeTab, setActiveTab] = useState<TabType>('all');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [reviewing, setReviewing] = useState(false);
+  const [editingItem, setEditingItem] = useState<NewsItem | null>(null);
+  const [editForm, setEditForm] = useState({ title: '', summary: '', category: '', importanceScore: 0 });
+  const [rejectReasonInput, setRejectReasonInput] = useState('');
 
   // Chat state
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -109,33 +119,24 @@ export default function WorkspacePage() {
   const [chatLoading, setChatLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Quick actions state
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
-
   // ─── Auth ────────────────────────────────────────────────────────
 
   const checkAuth = useCallback(async () => {
     try {
       const res = await fetch('/api/admin/verify');
-      if (res.ok) {
-        setAuthenticated(true);
-      }
-    } catch {
-      // not authenticated
-    }
+      if (res.ok) setAuthenticated(true);
+    } catch { /* not authenticated */ }
   }, []);
 
-  useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
+  useEffect(() => { checkAuth(); }, [checkAuth]);
 
   useEffect(() => {
     if (authenticated) {
-      loadDashboard();
+      loadNews();
+      loadPending();
     }
   }, [authenticated]);
 
-  // Auto-scroll chat
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -151,42 +152,194 @@ export default function WorkspacePage() {
         body: JSON.stringify({ password }),
       });
       const data = await res.json();
-      if (data.success) {
-        setAuthenticated(true);
-        setPassword('');
-      } else {
-        setAuthError(data.error || '密码错误');
-      }
-    } catch {
-      setAuthError('登录失败，请重试');
-    } finally {
-      setAuthLoading(false);
-    }
+      if (data.success) { setAuthenticated(true); setPassword(''); }
+      else { setAuthError(data.error || '密码错误'); }
+    } catch { setAuthError('登录失败，请重试'); }
+    finally { setAuthLoading(false); }
   };
 
-  // ─── Dashboard Data ──────────────────────────────────────────────
+  const handleLogout = async () => {
+    await fetch('/api/admin/logout', { method: 'POST' });
+    setAuthenticated(false);
+    setNews([]);
+    setMessages([]);
+  };
 
-  const loadDashboard = async () => {
-    setDashboardLoading(true);
+  // ─── Admin Data Loading ──────────────────────────────────────────
+
+  const loadNews = async () => {
+    setLoading(true);
     try {
-      const res = await fetch('/api/admin/ai/status');
+      const res = await fetch('/api/admin/news');
       const data = await res.json();
       if (data.success) {
-        setStats(data.stats);
-        setRecentLogs(data.recentLogs ?? []);
-        setRecentNews(data.recentNews ?? []);
+        const result = data.data;
+        setNews(Array.isArray(result) ? result : result?.items || []);
       }
-    } catch (err) {
-      console.error('加载仪表盘失败:', err);
-    } finally {
-      setDashboardLoading(false);
+    } catch (err) { console.error('加载新闻失败:', err); }
+    finally { setLoading(false); }
+  };
+
+  const loadPending = async () => {
+    try {
+      const res = await fetch('/api/admin/news/pending');
+      const data = await res.json();
+      setPendingNews(data.news || []);
+      setPendingCount(data.count || 0);
+    } catch { /* ignore */ }
+  };
+
+  // ─── Admin Actions ───────────────────────────────────────────────
+
+  const deleteNews = async (id: string) => {
+    if (!confirm('确定删除这条新闻？')) return;
+    setDeleting(id);
+    try {
+      const res = await fetch(`/api/admin/news?id=${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        setNews(prev => prev.filter(n => n.id !== id));
+        setPendingNews(prev => prev.filter(n => n.id !== id));
+        setPendingCount(prev => Math.max(0, prev - 1));
+      } else { alert(data.error || '删除失败'); }
+    } catch { alert('删除失败，请重试'); }
+    finally { setDeleting(null); }
+  };
+
+  const reviewSingle = async (id: string, action: 'approve' | 'reject', reason?: string) => {
+    try {
+      const res = await fetch('/api/admin/news/review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newsId: id, action, reason }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPendingNews(prev => prev.filter(n => n.id !== id));
+        setPendingCount(prev => Math.max(0, prev - 1));
+        setNews(prev => prev.map(n => n.id === id ? { ...n, status: action === 'approve' ? 'published' : 'rejected' } : n));
+      } else { alert(data.error || '审核失败'); }
+    } catch { alert('审核失败，请重试'); }
+  };
+
+  const batchReview = async (action: 'approve' | 'reject') => {
+    if (selectedIds.size === 0) return;
+    const reason = action === 'reject' ? rejectReasonInput : undefined;
+    setReviewing(true);
+    try {
+      const res = await fetch('/api/admin/news/batch-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newsIds: Array.from(selectedIds), action, reason }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPendingNews(prev => prev.filter(n => !selectedIds.has(n.id)));
+        setPendingCount(prev => Math.max(0, prev - selectedIds.size));
+        setSelectedIds(new Set());
+        setRejectReasonInput('');
+        await loadNews();
+      } else { alert(data.error || '批量审核失败'); }
+    } catch { alert('批量审核失败，请重试'); }
+    finally { setReviewing(false); }
+  };
+
+  const saveEdit = async () => {
+    if (!editingItem) return;
+    try {
+      const res = await fetch(`/api/admin/news/${editingItem.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: editForm.title,
+          summary: editForm.summary,
+          category: editForm.category,
+          importance_score: editForm.importanceScore,
+          importance_level: editForm.importanceScore >= 35 ? 'SSS' : editForm.importanceScore >= 25 ? 'SS' : editForm.importanceScore >= 15 ? 'S' : 'A',
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setEditingItem(null);
+        await loadNews();
+        await loadPending();
+      } else { alert(data.error || '编辑失败'); }
+    } catch { alert('编辑失败，请重试'); }
+  };
+
+  const openEdit = (item: NewsItem) => {
+    setEditingItem(item);
+    setEditForm({
+      title: item.title,
+      summary: item.summary,
+      category: item.category,
+      importanceScore: item.importance_score || item.importanceScore || 0,
+    });
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === pendingNews.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(pendingNews.map(n => n.id)));
     }
   };
 
-  // ─── Quick Actions ───────────────────────────────────────────────
+  // ─── Generate Actions ────────────────────────────────────────────
 
-  const triggerAction = async (type: string) => {
-    setActionLoading(type);
+  const triggerGenerate = async (type: 'collect' | 'daily' | 'weekly' | 'leaderboard') => {
+    setGenerating(type);
+    setGenerateResult(null);
+    try {
+      let url = '';
+      if (type === 'collect') url = '/api/news/collect';
+      else if (type === 'daily') url = '/api/daily/generate';
+      else if (type === 'weekly') url = '/api/weekly/generate';
+      else url = '/api/leaderboard/fetch';
+
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: type === 'leaderboard' ? JSON.stringify({ source: 'datalearner-aa' }) : undefined,
+      });
+      const data = await res.json();
+      setGenerateResult({
+        success: data.success ?? res.ok,
+        message: data.message || data.overview?.slice(0, 100) || data.error,
+        error: data.error,
+        newsCount: data.newsCount || data.data?.newsCount,
+      });
+      await loadNews();
+      await loadPending();
+    } catch { setGenerateResult({ success: false, error: '请求失败，请重试' }); }
+    finally { setGenerating(null); }
+  };
+
+  // ─── Chat Actions (quick actions that show in chat) ──────────────
+
+  function getActionLabel(type: string) {
+    const map: Record<string, string> = {
+      collect: '收集资讯',
+      daily: '生成日报',
+      weekly: '生成周报',
+      leaderboard: '更新排行榜',
+    };
+    return map[type] ?? type;
+  }
+
+  const triggerChatAction = async (type: string) => {
+    const actionLabel = getActionLabel(type);
+    const userMsg: ChatMessage = { role: 'user', content: actionLabel };
+    setMessages(prev => [...prev, userMsg]);
+
     try {
       let url = '';
       let body: Record<string, unknown> | undefined;
@@ -206,8 +359,7 @@ export default function WorkspacePage() {
       const data = await res.json();
       const success = data.success ?? res.ok;
 
-      // Add as system message in chat
-      setMessages((prev) => [
+      setMessages(prev => [
         ...prev,
         {
           role: 'assistant',
@@ -215,37 +367,25 @@ export default function WorkspacePage() {
           actionResult: {
             success,
             message: success
-              ? `「${getActionLabel(type)}」执行成功${data.newsCount ? `，共 ${data.newsCount} 条` : ''}`
-              : `「${getActionLabel(type)}」执行失败: ${data.error || '未知错误'}`,
+              ? `「${actionLabel}」执行成功${data.newsCount ? `，共 ${data.newsCount} 条` : ''}`
+              : `「${actionLabel}」执行失败: ${data.error || '未知错误'}`,
           },
         },
       ]);
 
-      // Refresh dashboard
-      await loadDashboard();
+      await loadNews();
+      await loadPending();
     } catch {
-      setMessages((prev) => [
+      setMessages(prev => [
         ...prev,
         {
           role: 'assistant',
           content: '',
-          actionResult: { success: false, message: `「${getActionLabel(type)}」请求失败` },
+          actionResult: { success: false, message: `「${actionLabel}」请求失败` },
         },
       ]);
-    } finally {
-      setActionLoading(null);
     }
   };
-
-  function getActionLabel(type: string) {
-    const map: Record<string, string> = {
-      collect: '收集资讯',
-      daily: '生成日报',
-      weekly: '生成周报',
-      leaderboard: '更新排行榜',
-    };
-    return map[type] ?? type;
-  }
 
   // ─── Chat ────────────────────────────────────────────────────────
 
@@ -256,13 +396,12 @@ export default function WorkspacePage() {
     const userMsg: ChatMessage = { role: 'user', content: text };
     const assistantMsg: ChatMessage = { role: 'assistant', content: '', isLoading: true };
 
-    setMessages((prev) => [...prev, userMsg, assistantMsg]);
+    setMessages(prev => [...prev, userMsg, assistantMsg]);
     setInput('');
     setChatLoading(true);
 
     try {
-      // Build conversation history for multi-turn
-      const history = [...messages, userMsg].map((m) => ({
+      const history = [...messages, userMsg].map(m => ({
         role: m.role,
         content: m.content,
       }));
@@ -273,9 +412,7 @@ export default function WorkspacePage() {
         body: JSON.stringify({ messages: history }),
       });
 
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
-      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       const reader = res.body?.getReader();
       if (!reader) throw new Error('No reader');
@@ -301,7 +438,7 @@ export default function WorkspacePage() {
 
             if (event.type === 'content' && event.content) {
               assistantContent += event.content;
-              setMessages((prev) => {
+              setMessages(prev => {
                 const updated = [...prev];
                 const last = updated[updated.length - 1];
                 if (last && last.role === 'assistant') {
@@ -311,7 +448,7 @@ export default function WorkspacePage() {
                 return updated;
               });
             } else if (event.type === 'action_start') {
-              setMessages((prev) => {
+              setMessages(prev => {
                 const updated = [...prev];
                 const last = updated[updated.length - 1];
                 if (last && last.role === 'assistant') {
@@ -333,8 +470,7 @@ export default function WorkspacePage() {
         }
       }
 
-      // Final update
-      setMessages((prev) => {
+      setMessages(prev => {
         const updated = [...prev];
         const last = updated[updated.length - 1];
         if (last && last.role === 'assistant') {
@@ -345,13 +481,13 @@ export default function WorkspacePage() {
         return updated;
       });
 
-      // Refresh dashboard after any action
       if (actionResult) {
-        await loadDashboard();
+        await loadNews();
+        await loadPending();
       }
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : '请求失败';
-      setMessages((prev) => {
+      setMessages(prev => {
         const updated = [...prev];
         const last = updated[updated.length - 1];
         if (last && last.role === 'assistant') {
@@ -372,6 +508,19 @@ export default function WorkspacePage() {
     }
   };
 
+  // ─── Helpers ─────────────────────────────────────────────────────
+
+  const getScore = (n: NewsItem) => n.importance_score ?? n.importanceScore ?? 0;
+  const getLevel = (n: NewsItem) => n.importance_level ?? n.importanceLevel ?? 'A';
+  const getSource = (n: NewsItem) => n.source_name ?? n.source ?? '未知';
+
+  const filteredNews = news.filter(n => {
+    if (filterCategory !== 'all' && n.category !== filterCategory) return false;
+    if (filterLevel !== 'all' && getLevel(n) !== filterLevel) return false;
+    if (activeTab !== 'all' && (n.status || 'published') !== activeTab) return false;
+    return true;
+  });
+
   // ─── Login Page ──────────────────────────────────────────────────
 
   if (!authenticated) {
@@ -382,14 +531,14 @@ export default function WorkspacePage() {
           <div className="bg-card rounded-lg border border-border p-8">
             <div className="flex items-center gap-3 mb-2">
               <Bot className="w-6 h-6 text-primary" />
-              <h1 className="text-2xl font-bold text-foreground">AI 工作台</h1>
+              <h1 className="text-2xl font-bold text-foreground">管理后台</h1>
             </div>
-            <p className="text-muted-foreground text-sm mb-6">输入密码以访问 AI 管理工作台</p>
+            <p className="text-muted-foreground text-sm mb-6">输入密码以访问管理后台</p>
             <form onSubmit={handleLogin}>
               <input
                 type="password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={e => setPassword(e.target.value)}
                 placeholder="请输入管理密码"
                 className="w-full px-4 py-3 rounded-md border border-border bg-muted text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/30 mb-4"
                 autoFocus
@@ -409,294 +558,362 @@ export default function WorkspacePage() {
     );
   }
 
-  // ─── Workspace ───────────────────────────────────────────────────
+  // ─── Admin Content (left columns) ────────────────────────────────
+
+  const adminContent = (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">管理后台</h1>
+          <p className="text-muted-foreground text-sm mt-1">管理新闻数据、审核资讯、手动触发内容生成</p>
+        </div>
+        <button onClick={handleLogout} className="px-4 py-2 text-sm border border-border rounded-md text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors">退出登录</button>
+      </div>
+
+      {/* Generate actions */}
+      <div className="bg-card rounded-lg border border-border p-6">
+        <h2 className="text-lg font-semibold text-foreground mb-4">手动触发生成</h2>
+        <div className="flex flex-wrap gap-3">
+          <button onClick={() => triggerGenerate('collect')} disabled={generating !== null} className="px-5 py-2.5 bg-primary text-primary-foreground rounded-md font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            {generating === 'collect' ? '收集中...' : '收集资讯'}
+          </button>
+          <button onClick={() => triggerGenerate('daily')} disabled={generating !== null} className="px-5 py-2.5 bg-muted text-foreground rounded-md font-medium hover:bg-muted/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            {generating === 'daily' ? '生成中...' : '生成日报'}
+          </button>
+          <button onClick={() => triggerGenerate('weekly')} disabled={generating !== null} className="px-5 py-2.5 bg-muted text-foreground rounded-md font-medium hover:bg-muted/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            {generating === 'weekly' ? '生成中...' : '生成周报'}
+          </button>
+          <button onClick={() => triggerGenerate('leaderboard')} disabled={generating !== null} className="px-5 py-2.5 bg-muted text-foreground rounded-md font-medium hover:bg-muted/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            {generating === 'leaderboard' ? '更新中...' : '更新排行榜'}
+          </button>
+        </div>
+        {generateResult && (
+          <div className={`mt-4 p-3 rounded-md text-sm ${generateResult.success ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
+            {generateResult.success
+              ? `操作成功${generateResult.newsCount ? `，共 ${generateResult.newsCount} 条新闻` : ''}${generateResult.message ? ` — ${generateResult.message}` : ''}`
+              : `操作失败: ${generateResult.error || '未知错误'}`}
+          </div>
+        )}
+        <p className="text-muted-foreground text-xs mt-3">提示: 「收集资讯」仅搜索和入库新闻，不生成日报；「生成日报」会自动发布pending新闻并生成AI日报文章。</p>
+      </div>
+
+      {/* Tabs */}
+      <div className="bg-card rounded-lg border border-border p-6">
+        <div className="flex items-center gap-4 mb-4 border-b border-border pb-3">
+          {(['all', 'pending', 'published', 'rejected'] as TabType[]).map(tab => (
+            <button
+              key={tab}
+              onClick={() => { setActiveTab(tab); setSelectedIds(new Set()); }}
+              className={`px-3 py-1.5 text-sm rounded-md transition-colors ${activeTab === tab ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
+            >
+              {tab === 'all' ? '全部' : STATUS_LABELS[tab] || tab}
+              {tab === 'pending' && pendingCount > 0 && (
+                <span className="ml-1.5 inline-flex items-center justify-center w-5 h-5 text-xs bg-red-500 text-white rounded-full">{pendingCount}</span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Pending batch actions */}
+        {activeTab === 'pending' && pendingNews.length > 0 && (
+          <div className="flex items-center gap-3 mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input type="checkbox" checked={selectedIds.size === pendingNews.length && pendingNews.length > 0} onChange={toggleSelectAll} className="rounded" />
+              全选 ({selectedIds.size}/{pendingNews.length})
+            </label>
+            <button
+              onClick={() => batchReview('approve')}
+              disabled={selectedIds.size === 0 || reviewing}
+              className="px-3 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              批量通过
+            </button>
+            <button
+              onClick={() => batchReview('reject')}
+              disabled={selectedIds.size === 0 || reviewing}
+              className="px-3 py-1.5 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              批量拒绝
+            </button>
+            <input
+              type="text"
+              value={rejectReasonInput}
+              onChange={e => setRejectReasonInput(e.target.value)}
+              placeholder="拒稿理由（可选）"
+              className="flex-1 px-3 py-1.5 text-sm border border-border rounded bg-white"
+            />
+          </div>
+        )}
+
+        {/* Filters */}
+        <div className="flex gap-3 mb-4">
+          <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} className="px-3 py-1.5 text-sm border border-border rounded-md bg-muted text-foreground">
+            <option value="all">全部分类</option>
+            {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
+              <option key={key} value={key}>{label}</option>
+            ))}
+          </select>
+          <select value={filterLevel} onChange={e => setFilterLevel(e.target.value)} className="px-3 py-1.5 text-sm border border-border rounded-md bg-muted text-foreground">
+            <option value="all">全部级别</option>
+            <option value="SSS">SSS</option>
+            <option value="SS">SS</option>
+            <option value="S">S</option>
+            <option value="A">A</option>
+          </select>
+          <button onClick={() => { loadNews(); loadPending(); }} disabled={loading} className="px-3 py-1.5 text-sm border border-border rounded-md text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50">
+            {loading ? '加载中...' : '刷新'}
+          </button>
+        </div>
+
+        {/* News list */}
+        {loading ? (
+          <div className="text-center py-12 text-muted-foreground">加载中...</div>
+        ) : filteredNews.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
+            {activeTab === 'pending' ? '暂无待审核新闻 🎉' : '暂无新闻数据'}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {filteredNews.map((item, idx) => {
+              const itemStatus = item.status || 'published';
+              const isSelected = selectedIds.has(item.id);
+              return (
+                <div key={item.id} className={`flex items-start gap-3 p-3 rounded-md border transition-colors ${isSelected ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/50'}`}>
+                  {activeTab === 'pending' && (
+                    <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(item.id)} className="mt-1 rounded" />
+                  )}
+                  <span className="text-muted-foreground text-sm font-mono w-6 text-right shrink-0 pt-0.5">{idx + 1}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start gap-2">
+                      <h3 className="text-foreground text-sm font-medium leading-snug line-clamp-2">{item.title}</h3>
+                    </div>
+                    {item.summary && (
+                      <p className="text-muted-foreground text-xs mt-1 line-clamp-2">{item.summary}</p>
+                    )}
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      <span className={`text-xs px-1.5 py-0.5 rounded ${LEVEL_COLORS[getLevel(item)] || 'bg-muted text-muted-foreground'}`}>
+                        {getLevel(item)}
+                      </span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded ${STATUS_COLORS[itemStatus] || 'bg-muted text-muted-foreground'}`}>
+                        {STATUS_LABELS[itemStatus] || itemStatus}
+                      </span>
+                      <span className="text-xs text-muted-foreground">{CATEGORY_LABELS[item.category] || item.category}</span>
+                      <span className="text-xs text-muted-foreground">来源: {getSource(item)}</span>
+                      <span className="text-xs text-muted-foreground">分数: {getScore(item)}</span>
+                      {item.reject_reason && (
+                        <span className="text-xs text-red-600">拒稿: {item.reject_reason}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {itemStatus === 'pending' && (
+                      <>
+                        <button onClick={() => reviewSingle(item.id, 'approve')} className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors">通过</button>
+                        <button onClick={() => reviewSingle(item.id, 'reject')} className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition-colors">拒绝</button>
+                      </>
+                    )}
+                    <button onClick={() => openEdit(item)} className="px-2 py-1 text-xs border border-border text-muted-foreground rounded hover:text-foreground hover:border-foreground/30 transition-colors">编辑</button>
+                    <button onClick={() => deleteNews(item.id)} disabled={deleting === item.id} className="px-2 py-1 text-xs border border-destructive/30 text-destructive rounded hover:bg-destructive/10 transition-colors disabled:opacity-50">
+                      {deleting === item.id ? '...' : '删除'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  // ─── Chat Panel (right column) ───────────────────────────────────
+
+  const chatPanel = (
+    <div className="flex flex-col bg-card rounded-lg border border-border" style={{ height: 'calc(100vh - 140px)' }}>
+      {/* Chat Header */}
+      <div className="flex items-center gap-2.5 px-5 py-4 border-b border-border shrink-0">
+        <Bot className="w-5 h-5 text-primary" />
+        <h2 className="text-lg font-semibold text-foreground">AI 助手</h2>
+        <span className="text-xs text-muted-foreground ml-2">可以问我任何问题，或让我执行操作</span>
+      </div>
+
+      {/* Messages Area */}
+      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+        {messages.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+            <Bot className="w-12 h-12 mb-4 opacity-30" />
+            <p className="text-sm">你好！我是 AI Pulse 管理助手</p>
+            <p className="text-xs mt-1">你可以让我查看数据、收集资讯、生成日报等</p>
+            <div className="flex flex-wrap gap-2 mt-4">
+              {['查看系统状态', '最近有什么新闻？', '今天待审核的新闻有多少？'].map(q => (
+                <button
+                  key={q}
+                  onClick={() => setInput(q)}
+                  className="px-3 py-1.5 text-xs bg-muted text-muted-foreground rounded-md hover:text-foreground hover:bg-muted/80 transition-colors"
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+            {/* Quick action buttons */}
+            <div className="flex flex-wrap gap-2 mt-3">
+              {[
+                { type: 'collect', label: '收集资讯', icon: Newspaper },
+                { type: 'daily', label: '生成日报', icon: Calendar },
+              ].map(({ type, label, icon: Icon }) => (
+                <button
+                  key={type}
+                  onClick={() => triggerChatAction(type)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-primary/10 text-primary rounded-md hover:bg-primary/20 transition-colors"
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {messages.map((msg, idx) => (
+          <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div className="max-w-[80%]">
+              {msg.role === 'user' ? (
+                <div className="bg-primary text-primary-foreground px-4 py-2.5 rounded-lg rounded-br-sm text-sm leading-relaxed whitespace-pre-wrap">
+                  {msg.content}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {msg.actionResult && (
+                    <div className={`flex items-start gap-2 px-4 py-3 rounded-lg border text-sm ${msg.actionResult.success ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
+                      {msg.actionResult.success ? (
+                        <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+                      ) : (
+                        <XCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                      )}
+                      <span>{msg.actionResult.message}</span>
+                    </div>
+                  )}
+                  {msg.content && (
+                    <div className="bg-card border border-border px-4 py-2.5 rounded-lg rounded-bl-sm text-sm leading-relaxed whitespace-pre-wrap text-foreground">
+                      {msg.isLoading && !msg.content ? (
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>思考中...</span>
+                        </div>
+                      ) : (
+                        msg.content
+                      )}
+                    </div>
+                  )}
+                  {msg.isLoading && !msg.content && !msg.actionResult && (
+                    <div className="bg-card border border-border px-4 py-2.5 rounded-lg rounded-bl-sm text-sm">
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>AI 正在处理...</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input Area */}
+      <div className="px-5 py-4 border-t border-border shrink-0">
+        <div className="flex gap-3">
+          <textarea
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="输入消息... (Enter 发送, Shift+Enter 换行)"
+            rows={2}
+            className="flex-1 px-4 py-2.5 text-sm border border-border rounded-lg bg-muted text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
+          />
+          <button
+            onClick={sendMessage}
+            disabled={chatLoading || !input.trim()}
+            className="px-4 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed self-end"
+          >
+            {chatLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ─── Main Layout ─────────────────────────────────────────────────
 
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
       <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* ─── LEFT: AI Chat Panel (col-span-2) ─────────────── */}
-          <div className="lg:col-span-2 flex flex-col bg-card rounded-lg border border-border" style={{ height: 'calc(100vh - 140px)' }}>
-            {/* Chat Header */}
-            <div className="flex items-center gap-2.5 px-5 py-4 border-b border-border shrink-0">
-              <Bot className="w-5 h-5 text-primary" />
-              <h2 className="text-lg font-semibold text-foreground">AI 管理助手</h2>
-              <span className="text-xs text-muted-foreground ml-2">可以问我任何关于站点的问题，或让我执行操作</span>
-            </div>
+        {/* Mobile Tab Switcher */}
+        <div className="flex lg:hidden gap-2 mb-4">
+          <button
+            onClick={() => setMobileTab('admin')}
+            className={`flex-1 py-2.5 text-sm rounded-md font-medium transition-colors ${mobileTab === 'admin' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}`}
+          >
+            管理
+          </button>
+          <button
+            onClick={() => setMobileTab('chat')}
+            className={`flex-1 py-2.5 text-sm rounded-md font-medium transition-colors ${mobileTab === 'chat' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}`}
+          >
+            <span className="flex items-center justify-center gap-1.5">
+              <Bot className="w-4 h-4" />
+              AI 助手
+            </span>
+          </button>
+        </div>
 
-            {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-              {messages.length === 0 && (
-                <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                  <Bot className="w-12 h-12 mb-4 opacity-30" />
-                  <p className="text-sm">你好！我是 AI Pulse 管理助手</p>
-                  <p className="text-xs mt-1">你可以让我查看数据、收集资讯、生成日报等</p>
-                  <div className="flex flex-wrap gap-2 mt-4">
-                    {['查看系统状态', '最近有什么新闻？', '今天待审核的新闻有多少？'].map((q) => (
-                      <button
-                        key={q}
-                        onClick={() => {
-                          setInput(q);
-                        }}
-                        className="px-3 py-1.5 text-xs bg-muted text-muted-foreground rounded-md hover:text-foreground hover:bg-muted/80 transition-colors"
-                      >
-                        {q}
-                      </button>
-                    ))}
-                  </div>
+        {/* Desktop: 3-column grid. Mobile: show selected tab */}
+        <div className="hidden lg:grid lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">{adminContent}</div>
+          <div>{chatPanel}</div>
+        </div>
+        <div className="lg:hidden">
+          {mobileTab === 'admin' ? adminContent : chatPanel}
+        </div>
+      </div>
+
+      {/* Edit modal */}
+      {editingItem && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setEditingItem(null)}>
+          <div className="bg-card rounded-lg border border-border p-6 max-w-lg w-full" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-foreground mb-4">编辑新闻</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm text-muted-foreground mb-1 block">标题</label>
+                <input type="text" value={editForm.title} onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))} className="w-full px-3 py-2 text-sm border border-border rounded-md bg-muted text-foreground" />
+              </div>
+              <div>
+                <label className="text-sm text-muted-foreground mb-1 block">摘要</label>
+                <textarea value={editForm.summary} onChange={e => setEditForm(f => ({ ...f, summary: e.target.value }))} rows={4} className="w-full px-3 py-2 text-sm border border-border rounded-md bg-muted text-foreground resize-none" />
+              </div>
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <label className="text-sm text-muted-foreground mb-1 block">分类</label>
+                  <select value={editForm.category} onChange={e => setEditForm(f => ({ ...f, category: e.target.value }))} className="w-full px-3 py-2 text-sm border border-border rounded-md bg-muted text-foreground">
+                    {Object.entries(CATEGORY_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                  </select>
                 </div>
-              )}
-
-              {messages.map((msg, idx) => (
-                <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[80%] ${msg.role === 'user' ? 'order-1' : 'order-1'}`}>
-                    {msg.role === 'user' ? (
-                      <div className="bg-primary text-primary-foreground px-4 py-2.5 rounded-lg rounded-br-sm text-sm leading-relaxed whitespace-pre-wrap">
-                        {msg.content}
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        {/* Action result card */}
-                        {msg.actionResult && (
-                          <div
-                            className={`flex items-start gap-2 px-4 py-3 rounded-lg border text-sm ${
-                              msg.actionResult.success
-                                ? 'bg-green-50 border-green-200 text-green-800'
-                                : 'bg-red-50 border-red-200 text-red-800'
-                            }`}
-                          >
-                            {msg.actionResult.success ? (
-                              <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
-                            ) : (
-                              <XCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                            )}
-                            <span>{msg.actionResult.message}</span>
-                          </div>
-                        )}
-                        {/* Assistant text content */}
-                        {msg.content && (
-                          <div className="bg-card border border-border px-4 py-2.5 rounded-lg rounded-bl-sm text-sm leading-relaxed whitespace-pre-wrap text-foreground">
-                            {msg.isLoading && !msg.content ? (
-                              <div className="flex items-center gap-2 text-muted-foreground">
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                <span>思考中...</span>
-                              </div>
-                            ) : (
-                              msg.content
-                            )}
-                          </div>
-                        )}
-                        {/* Loading indicator */}
-                        {msg.isLoading && !msg.content && !msg.actionResult && (
-                          <div className="bg-card border border-border px-4 py-2.5 rounded-lg rounded-bl-sm text-sm">
-                            <div className="flex items-center gap-2 text-muted-foreground">
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              <span>AI 正在处理...</span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                <div className="flex-1">
+                  <label className="text-sm text-muted-foreground mb-1 block">分数</label>
+                  <input type="number" value={editForm.importanceScore} onChange={e => setEditForm(f => ({ ...f, importanceScore: Number(e.target.value) }))} className="w-full px-3 py-2 text-sm border border-border rounded-md bg-muted text-foreground" />
                 </div>
-              ))}
-              <div ref={messagesEndRef} />
-            </div>
-
-            {/* Input Area */}
-            <div className="px-5 py-4 border-t border-border shrink-0">
-              <div className="flex gap-3">
-                <textarea
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="输入消息... (Enter 发送, Shift+Enter 换行)"
-                  rows={2}
-                  className="flex-1 px-4 py-2.5 text-sm border border-border rounded-lg bg-muted text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
-                />
-                <button
-                  onClick={sendMessage}
-                  disabled={chatLoading || !input.trim()}
-                  className="px-4 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed self-end"
-                >
-                  {chatLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
-                </button>
               </div>
             </div>
-          </div>
-
-          {/* ─── RIGHT: Dashboard (col-span-1) ────────────────── */}
-          <div className="space-y-5">
-            {/* Back Link */}
-            <Link
-              href="/admin"
-              className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              返回管理后台
-            </Link>
-
-            {/* Stats Cards (2x2) */}
-            {dashboardLoading ? (
-              <div className="grid grid-cols-2 gap-3">
-                {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="bg-card rounded-lg border border-border p-4 animate-pulse">
-                    <div className="h-4 bg-muted rounded w-16 mb-2" />
-                    <div className="h-7 bg-muted rounded w-12" />
-                  </div>
-                ))}
-              </div>
-            ) : stats ? (
-              <div className="grid grid-cols-2 gap-3">
-                {/* Total News */}
-                <div className="bg-card rounded-lg border border-border p-4">
-                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                    <Newspaper className="w-4 h-4" />
-                    <span className="text-xs">全部新闻</span>
-                  </div>
-                  <p className="text-2xl font-bold text-foreground">{stats.totalNews}</p>
-                </div>
-                {/* Published */}
-                <div className="bg-card rounded-lg border border-border p-4">
-                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                    <CheckCircle className="w-4 h-4" />
-                    <span className="text-xs">已发布</span>
-                  </div>
-                  <p className="text-2xl font-bold text-foreground">{stats.publishedNews}</p>
-                </div>
-                {/* Pending */}
-                <div className={`bg-card rounded-lg border p-4 ${stats.pendingNews > 0 ? 'border-yellow-300 bg-yellow-50/50' : 'border-border'}`}>
-                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                    <Clock className="w-4 h-4" />
-                    <span className="text-xs">待审核</span>
-                  </div>
-                  <p className={`text-2xl font-bold ${stats.pendingNews > 0 ? 'text-yellow-700' : 'text-foreground'}`}>
-                    {stats.pendingNews}
-                  </p>
-                </div>
-                {/* Reports */}
-                <div className="bg-card rounded-lg border border-border p-4">
-                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                    <Calendar className="w-4 h-4" />
-                    <span className="text-xs">日报/周报</span>
-                  </div>
-                  <p className="text-2xl font-bold text-foreground">
-                    {stats.totalDailyReports}/{stats.totalWeeklyReports}
-                  </p>
-                </div>
-              </div>
-            ) : null}
-
-            {/* Quick Actions */}
-            <div className="bg-card rounded-lg border border-border p-4">
-              <h3 className="text-sm font-semibold text-foreground mb-3">快捷操作</h3>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { type: 'collect', label: '收集资讯', icon: Newspaper },
-                  { type: 'daily', label: '生成日报', icon: Calendar },
-                  { type: 'weekly', label: '生成周报', icon: Calendar },
-                  { type: 'leaderboard', label: '更新排行榜', icon: Terminal },
-                ].map(({ type, label, icon: Icon }) => (
-                  <button
-                    key={type}
-                    onClick={() => triggerAction(type)}
-                    disabled={actionLoading !== null}
-                    className="flex items-center justify-center gap-2 px-3 py-2.5 text-sm bg-muted text-foreground rounded-md hover:bg-muted/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {actionLoading === type ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Icon className="w-4 h-4" />
-                    )}
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Recent Activity */}
-            <div className="bg-card rounded-lg border border-border p-4">
-              <h3 className="text-sm font-semibold text-foreground mb-3">最近活动</h3>
-              {recentLogs.length === 0 ? (
-                <p className="text-xs text-muted-foreground">暂无活动记录</p>
-              ) : (
-                <div className="space-y-2.5">
-                  {recentLogs.map((log) => (
-                    <div key={log.id} className="flex items-start gap-2.5 text-xs">
-                      <div className="mt-0.5">
-                        {log.status === 'success' ? (
-                          <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
-                        ) : log.status === 'failed' ? (
-                          <XCircle className="w-3.5 h-3.5 text-red-600" />
-                        ) : (
-                          <AlertCircle className="w-3.5 h-3.5 text-yellow-600" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-medium text-foreground">
-                            {LOG_TYPE_LABELS[log.type] ?? log.type}
-                          </span>
-                          <span
-                            className={`px-1.5 py-0.5 rounded text-[10px] ${
-                              log.status === 'success'
-                                ? 'bg-green-100 text-green-700'
-                                : log.status === 'failed'
-                                  ? 'bg-red-100 text-red-700'
-                                  : 'bg-yellow-100 text-yellow-700'
-                            }`}
-                          >
-                            {LOG_STATUS_LABELS[log.status] ?? log.status}
-                          </span>
-                        </div>
-                        <p className="text-muted-foreground mt-0.5">
-                          {log.target_date} · 发现 {log.discovered_count ?? 0} · 入库 {log.after_filter_count ?? 0}
-                        </p>
-                      </div>
-                      <span className="text-muted-foreground shrink-0">{formatTime(log.started_at)}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Recent News */}
-            <div className="bg-card rounded-lg border border-border p-4">
-              <h3 className="text-sm font-semibold text-foreground mb-3">最新新闻</h3>
-              {recentNews.length === 0 ? (
-                <p className="text-xs text-muted-foreground">暂无新闻</p>
-              ) : (
-                <div className="space-y-2.5">
-                  {recentNews.map((news) => (
-                    <div key={news.id} className="flex items-start gap-2 text-xs">
-                      <span
-                        className={`px-1.5 py-0.5 rounded text-[10px] font-mono shrink-0 ${
-                          news.importance_level === 'SSS'
-                            ? 'bg-red-100 text-red-800'
-                            : news.importance_level === 'SS'
-                              ? 'bg-orange-100 text-orange-800'
-                              : news.importance_level === 'S'
-                                ? 'bg-yellow-100 text-yellow-800'
-                                : 'bg-blue-100 text-blue-800'
-                        }`}
-                      >
-                        {news.importance_level}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-foreground font-medium leading-snug line-clamp-2">{news.title}</p>
-                        <p className="text-muted-foreground mt-0.5">
-                          {CATEGORY_LABELS[news.category] ?? news.category} · {news.source_name ?? '未知'}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+            <div className="flex justify-end gap-3 mt-6">
+              <button onClick={() => setEditingItem(null)} className="px-4 py-2 text-sm border border-border rounded-md text-muted-foreground hover:text-foreground">取消</button>
+              <button onClick={saveEdit} className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90">保存</button>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
