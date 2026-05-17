@@ -67,6 +67,15 @@ A(<14): 低优先级（过滤掉）
 - check_status: 查看系统状态（数据库统计、最近采集日志）
 - query_news: 查询新闻列表（支持按分类、等级、状态筛选）
 
+## AI 长期记忆系统
+- 数据库表: ai_memories (key, value, category)
+- 支持的分类(category): preference, fact, instruction, context, general
+- AI可以通过 save_memory 函数主动保存重要信息
+- 记忆会在每次对话时自动加载到系统提示中
+- 使用场景: 记住用户偏好、项目配置、重要事实、操作习惯等
+- 当对话中出现值得记住的信息时，应主动调用 save_memory 保存
+- 如果用户要求忘记某事，调用 delete_memory 删除对应记忆
+
 ## 当前环境
 - 部署平台：Railway（push到GitHub master自动构建部署）
 - GitHub仓库：github.com/czj527/aiweb
@@ -138,6 +147,43 @@ export const AI_FUNCTIONS = [
         },
       },
       required: ["query_type"],
+    },
+  },
+  {
+    name: "save_memory",
+    description: "保存重要信息到长期记忆。当用户提到偏好、重要事实、配置信息或任何值得长期记住的内容时，主动调用此函数。也可以在用户明确要求记住某事时调用。",
+    parameters: {
+      type: "object",
+      properties: {
+        key: {
+          type: "string",
+          description: "记忆的唯一标识（简短描述性名称，如 user_preference_language, site_config_theme）",
+        },
+        value: {
+          type: "string",
+          description: "记忆的具体内容",
+        },
+        category: {
+          type: "string",
+          enum: ["preference", "fact", "instruction", "context", "general"],
+          description: "记忆分类: preference(偏好), fact(事实), instruction(指令), context(上下文), general(通用)",
+        },
+      },
+      required: ["key", "value"],
+    },
+  },
+  {
+    name: "delete_memory",
+    description: "删除一条长期记忆。当用户要求忘记某事或不再需要某条记忆时调用。",
+    parameters: {
+      type: "object",
+      properties: {
+        key: {
+          type: "string",
+          description: "要删除的记忆的key",
+        },
+      },
+      required: ["key"],
     },
   },
 ];

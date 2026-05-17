@@ -11,6 +11,12 @@ import {
   Newspaper,
   Calendar,
   Terminal,
+  Brain,
+  Plus,
+  Trash2,
+  ChevronDown,
+  ChevronRight,
+  Edit3,
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -54,6 +60,24 @@ interface ChatMessage {
   actionResult?: { success: boolean; message: string };
   isLoading?: boolean;
 }
+
+interface AiMemory {
+  id: string;
+  key: string;
+  value: string;
+  category: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Persisted shape (no ephemeral isLoading)
+interface PersistedChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  actionResult?: { success: boolean; message: string };
+}
+
+const CHAT_STORAGE_KEY = 'ai-pulse-chat-messages';
 
 // ─── Constants ───────────────────────────────────────────────────────
 
@@ -123,10 +147,29 @@ export default function WorkspacePage() {
   const [rejectReasonInput, setRejectReasonInput] = useState('');
 
   // Chat state
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    try {
+      const stored = localStorage.getItem(CHAT_STORAGE_KEY);
+      if (stored) {
+        const parsed: PersistedChatMessage[] = JSON.parse(stored);
+        return parsed.map(m => ({ ...m, isLoading: false }));
+      }
+    } catch { /* ignore */ }
+    return [];
+  });
   const [input, setInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Memory state
+  const [memories, setMemories] = useState<AiMemory[]>([]);
+  const [memoryPanelOpen, setMemoryPanelOpen] = useState(false);
+  const [memoryLoading, setMemoryLoading] = useState(false);
+  const [newMemory, setNewMemory] = useState({ key: '', value: '', category: 'general' });
+  const [addingMemory, setAddingMemory] = useState(false);
+  const [editingMemoryId, setEditingMemoryId] = useState<string | null>(null);
+  const [editMemoryForm, setEditMemoryForm] = useState({ key: '', value: '', category: 'general' });
 
   // ─── Auth ────────────────────────────────────────────────────────
 
@@ -150,6 +193,92 @@ export default function WorkspacePage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Persist messages to localStorage (debounced, strip isLoading)
+  useEffect(() => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      try {
+        const toSave: PersistedChatMessage[] = messages.map(m => ({
+          role: m.role,
+          content: m.content,
+          ...(m.actionResult ? { actionResult: m.actionResult } : {}),
+        }));
+        localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(toSave));
+      } catch { /* quota exceeded, ignore */ }
+    }, 500);
+    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
+  }, [messages]);
+
+  const clearChatHistory = () => {
+    setMessages([]);
+    try { localStorage.removeItem(CHAT_STORAGE_KEY); } catch { /* ignore */ }
+  };
+
+  // ─── Memory CRUD ───────────────────────────────────────────────
+
+  const loadMemories = async () => {
+    setMemoryLoading(true);
+    try {
+      const res = await fetch('/api/admin/ai/memory');
+      const data = await res.json();
+      if (data.success) setMemories(data.data || []);
+    } catch (err) { console.error('加载记忆失败:', err); }
+    finally { setMemoryLoading(false); }
+  };
+
+  const addMemory = async () => {
+    if (!newMemory.key.trim() || !newMemory.value.trim()) return;
+    setAddingMemory(true);
+    try {
+      const res = await fetch('/api/admin/ai/memory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newMemory),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setNewMemory({ key: '', value: '', category: 'general' });
+        await loadMemories();
+      } else { alert(data.error || '保存失败'); }
+    } catch { alert('保存失败，请重试'); }
+    finally { setAddingMemory(false); }
+  };
+
+  const updateMemory = async (id: string) => {
+    try {
+      const res = await fetch('/api/admin/ai/memory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editMemoryForm),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setEditingMemoryId(null);
+        await loadMemories();
+      } else { alert(data.error || '更新失败'); }
+    } catch { alert('更新失败，请重试'); }
+  };
+
+  const deleteMemory = async (id: string) => {
+    if (!confirm('确定删除这条记忆？')) return;
+    try {
+      const res = await fetch(`/api/admin/ai/memory?id=${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) await loadMemories();
+      else alert(data.error || '删除失败');
+    } catch { alert('删除失败，请重试'); }
+  };
+
+  const MEMORY_CATEGORY_LABELS: Record<string, string> = {
+    preference: '偏好',
+    fact: '事实',
+    instruction: '指令',
+    context: '上下文',
+    general: '通用',
+  };
+
+  // ─── Auth ────────────────────────────────────────────────────────
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError('');
@@ -172,6 +301,7 @@ export default function WorkspacePage() {
     setAuthenticated(false);
     setNews([]);
     setMessages([]);
+    try { localStorage.removeItem(CHAT_STORAGE_KEY); } catch { /* ignore */ }
   };
 
   // ─── Admin Data Loading ──────────────────────────────────────────
@@ -889,16 +1019,24 @@ export default function WorkspacePage() {
   // ─── Chat Panel (right column) ───────────────────────────────────
 
   const chatPanel = (
-    <div className="flex flex-col bg-card rounded-lg border border-border" style={{ height: 'calc(100vh - 140px)' }}>
+    <div className="flex flex-col bg-card rounded-lg border border-border overflow-hidden" style={{ height: 'calc(100vh - 140px)' }}>
       {/* Chat Header */}
       <div className="flex items-center gap-2.5 px-5 py-4 border-b border-border shrink-0">
         <Bot className="w-5 h-5 text-primary" />
         <h2 className="text-lg font-semibold text-foreground">AI 助手</h2>
         <span className="text-xs text-muted-foreground ml-2">可以问我任何问题，或让我执行操作</span>
+        {messages.length > 0 && (
+          <button
+            onClick={clearChatHistory}
+            className="ml-auto px-2.5 py-1 text-xs border border-border text-muted-foreground rounded hover:text-foreground hover:border-foreground/30 transition-colors"
+          >
+            清空
+          </button>
+        )}
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+      <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-4 space-y-4">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
             <Bot className="w-12 h-12 mb-4 opacity-30" />

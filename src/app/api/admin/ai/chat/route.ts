@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import OpenAI from "openai";
 import { verifyAdminToken } from "@/lib/admin-auth";
 import { PROJECT_KNOWLEDGE, AI_FUNCTIONS } from "@/lib/services/ai-knowledge";
-import { executeAction, queryDatabase } from "@/lib/services/ai-actions";
+import { executeAction, queryDatabase, saveMemory, deleteMemory, loadMemories } from "@/lib/services/ai-actions";
 
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || process.env.LLM_API_KEY || "";
 const DEEPSEEK_BASE_URL = process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com";
@@ -28,15 +28,39 @@ interface ToolCall {
   };
 }
 
-function buildSystemPrompt(): string {
-  return `${PROJECT_KNOWLEDGE}
+function buildSystemPrompt(memories: Array<{ key: string; value: string; category: string }> = []): string {
+  let memorySection = '';
+  if (memories.length > 0) {
+    const grouped: Record<string, string[]> = {};
+    for (const m of memories) {
+      if (!grouped[m.category]) grouped[m.category] = [];
+      grouped[m.category].push(`- ${m.key}: ${m.value}`);
+    }
+    const categoryLabels: Record<string, string> = {
+      preference: '用户偏好',
+      fact: '事实记录',
+      instruction: '指令',
+      context: '上下文',
+      general: '通用',
+    };
+    const lines: string[] = [];
+    for (const [cat, items] of Object.entries(grouped)) {
+      lines.push(`### ${categoryLabels[cat] || cat}`);
+      lines.push(...items);
+    }
+    memorySection = `\n\n## 已记忆的信息\n${lines.join('\n')}`;
+  }
+
+  return `${PROJECT_KNOWLEDGE}${memorySection}
 
 ## 回复规则
 1. 使用中文回复，简洁专业
 2. 需要执行操作时，调用 execute_action 函数
 3. 需要查询数据时，调用 query_database 函数
-4. 回答基于实际数据，不要编造信息
-5. 如果操作失败，分析原因并给出建议`;
+4. 当发现值得长期记住的信息时，调用 save_memory 保存
+5. 当用户要求忘记某事时，调用 delete_memory 删除
+6. 回答基于实际数据，不要编造信息
+7. 如果操作失败，分析原因并给出建议`;
 }
 
 function sseData(data: Record<string, unknown>): string {
@@ -54,7 +78,7 @@ async function handleToolCalls(
     const { name, arguments: argsStr } = toolCall.function;
     let result: { success: boolean; message: string; data?: unknown };
 
-    const actionLabel = name === "execute_action" ? "执行操作" : "查询数据";
+    const actionLabel = name === "execute_action" ? "执行操作" : name === "query_database" ? "查询数据" : name === "save_memory" ? "保存记忆" : name === "delete_memory" ? "删除记忆" : "调用函数";
 
     try {
       const args = JSON.parse(argsStr);
@@ -72,6 +96,10 @@ async function handleToolCalls(
         result = await executeAction(args.action);
       } else if (name === "query_database") {
         result = await queryDatabase(args.query_type, args.params);
+      } else if (name === "save_memory") {
+        result = await saveMemory(args.key, args.value, args.category || "general");
+      } else if (name === "delete_memory") {
+        result = await deleteMemory(args.key);
       } else {
         result = { success: false, message: `未知函数: ${name}` };
       }
@@ -136,9 +164,12 @@ export async function POST(request: NextRequest) {
   const stream = new ReadableStream({
     async start(controller) {
       try {
+        // Load memories for the system prompt
+        const memories = await loadMemories();
+
         // Build initial messages with system prompt
         const apiMessages: OpenAI.ChatCompletionMessageParam[] = [
-          { role: "system", content: buildSystemPrompt() },
+          { role: "system", content: buildSystemPrompt(memories) },
           ...messages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
         ];
 

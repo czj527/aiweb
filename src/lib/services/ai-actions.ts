@@ -128,3 +128,83 @@ export async function queryDatabase(
     };
   }
 }
+
+/** Save a memory (upsert by key) */
+export async function saveMemory(
+  key: string,
+  value: string,
+  category: string = 'general'
+): Promise<{ success: boolean; message: string; data?: unknown }> {
+  const client = getSupabaseClient();
+
+  try {
+    const { data, error } = await client
+      .from('ai_memories')
+      .upsert({ key, value, category }, { onConflict: 'key' })
+      .select()
+      .single();
+
+    if (error) {
+      if (error.message?.includes('does not exist') || error.code === '42P01') {
+        return { success: false, message: 'ai_memories 表尚未创建，请联系管理员执行数据库迁移' };
+      }
+      throw error;
+    }
+
+    return { success: true, message: `记忆「${key}」已保存`, data };
+  } catch (e) {
+    return { success: false, message: `保存记忆失败: ${e instanceof Error ? e.message : String(e)}` };
+  }
+}
+
+/** Delete a memory by key */
+export async function deleteMemory(
+  key: string
+): Promise<{ success: boolean; message: string }> {
+  const client = getSupabaseClient();
+
+  try {
+    const { error } = await client
+      .from('ai_memories')
+      .delete()
+      .eq('key', key);
+
+    if (error) {
+      if (error.message?.includes('does not exist') || error.code === '42P01') {
+        return { success: false, message: 'ai_memories 表尚未创建' };
+      }
+      throw error;
+    }
+
+    return { success: true, message: `记忆「${key}」已删除` };
+  } catch (e) {
+    return { success: false, message: `删除记忆失败: ${e instanceof Error ? e.message : String(e)}` };
+  }
+}
+
+/** Load all memories for injection into system prompt */
+export async function loadMemories(): Promise<Array<{ key: string; value: string; category: string }>> {
+  const client = getSupabaseClient();
+
+  try {
+    const { data, error } = await client
+      .from('ai_memories')
+      .select('key, value, category')
+      .order('category', { ascending: true })
+      .order('key', { ascending: true });
+
+    if (error) {
+      // Table doesn't exist yet — return empty gracefully
+      if (error.message?.includes('does not exist') || error.code === '42P01') {
+        return [];
+      }
+      console.warn('[loadMemories] Error:', error.message);
+      return [];
+    }
+
+    return data ?? [];
+  } catch (e) {
+    console.warn('[loadMemories] Error:', e instanceof Error ? e.message : String(e));
+    return [];
+  }
+}

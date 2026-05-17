@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { Suspense, useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Navbar } from '@/components/navbar';
 import Link from 'next/link';
 import { type NewsCategory, categoryConfig } from '@/lib/types';
@@ -22,13 +23,24 @@ interface NewsItem {
 type ReportType = 'daily' | 'weekly';
 
 export default function NewsPage() {
+  return (
+    <Suspense fallback={null}>
+      <NewsPageInner />
+    </Suspense>
+  );
+}
+
+function NewsPageInner() {
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<ReportType>('daily');
   const [news, setNews] = useState<NewsItem[]>([]);
   const [reportDate, setReportDate] = useState('');
   const [overview, setOverview] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [filterCategory, setFilterCategory] = useState<string>(
+    searchParams.get('category') || 'all'
+  );
   const [searchQuery, setSearchQuery] = useState('');
 
   const loadData = useCallback(async () => {
