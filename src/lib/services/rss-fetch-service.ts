@@ -352,7 +352,7 @@ export async function fetchAllRSSFeeds(
 // ============================================================
 
 /** 橘鸦分类 → 我们的 NewsCategory 映射 */
-const JUYA_CATEGORY_MAP: Record<string, string> = {
+export const JUYA_CATEGORY_MAP: Record<string, string> = {
   "要闻": "model",
   "模型发布": "model",
   "开发生态": "opensource",

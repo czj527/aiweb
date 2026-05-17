@@ -3,6 +3,7 @@ import type { SearchResult } from "./search-service";
 import type { FetchResult } from "./fetch-service";
 import { NEWS_SOURCES, type SourcePriority } from "./search-service";
 import { getRecentNews } from "./db-service";
+import { JUYA_CATEGORY_MAP as JUYA_CAT_MAP } from "./rss-fetch-service";
 // NewsCategory is defined locally below (from NEWS_CATEGORIES)
 
 /**
@@ -198,22 +199,8 @@ export interface ProcessedNews {
 // 橘鸦AI早报 → ProcessedNews 直接转换（跳过AI处理）
 // ============================================================
 
-/** 橘鸦分类名 → NewsCategory 映射 */
-const JUYA_CATEGORY_MAP: Record<string, NewsCategory> = {
-  "要闻": "model",
-  "模型发布": "model",
-  "开发生态": "opensource",
-  "产品应用": "product",
-  "技术与洞察": "research",
-  "行业动态": "industry",
-  "政策与治理": "policy",
-  "前瞻与传闻": "rumor",
-  // 兼容旧分类名
-  "大模型动态": "model",
-  "产品发布": "product",
-  "学术研究": "research",
-  "Agent 生态": "agent",
-};
+/** 橘鸦分类名 → NewsCategory 映射（复用 rss-fetch-service 的定义） */
+const JUYA_CATEGORY_MAP: Record<string, NewsCategory> = JUYA_CAT_MAP as Record<string, NewsCategory>;
 
 /**
  * 将橘鸦RSS解析出的SearchResult直接转为ProcessedNews

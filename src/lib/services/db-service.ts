@@ -93,16 +93,55 @@ export async function upsertNewsItem(news: ProcessedNews): Promise<string> {
 }
 
 /**
- * 批量插入新闻条目
+ * 批量插入新闻条目（优化：先批量查询已有URL，再批量插入新条目）
  */
 export async function upsertNewsItems(
   newsList: ProcessedNews[]
 ): Promise<Map<string, string>> {
   const urlToId = new Map<string, string>();
+  if (newsList.length === 0) return urlToId;
 
+  const client = getClient();
+
+  // Step 1: Check which URLs already exist
+  const urls = newsList.map(n => n.sourceUrl);
+  const { data: existing } = await client
+    .from("news_items")
+    .select("id, source_url")
+    .in("source_url", urls);
+
+  const existingMap = new Map<string, string>();
+  for (const row of existing || []) {
+    existingMap.set(row.source_url, row.id);
+  }
+
+  // Step 2: Insert new items
+  const newItems: Array<Record<string, unknown>> = [];
   for (const news of newsList) {
-    const id = await upsertNewsItem(news);
+    if (existingMap.has(news.sourceUrl)) {
+      urlToId.set(news.sourceUrl, existingMap.get(news.sourceUrl)!);
+      continue;
+    }
+    const id = crypto.randomUUID();
+    newItems.push({
+      id,
+      title: news.title,
+      summary: news.summary,
+      source_name: news.sourceName,
+      source_url: news.sourceUrl,
+      category: news.category,
+      importance_score: news.importanceScore,
+      importance_level: news.importanceLevel,
+      keywords: news.keywords,
+      is_ai_related: news.isAIRelated,
+      published_at: normalizePublishedAt(news.publishedAt),
+    });
     urlToId.set(news.sourceUrl, id);
+  }
+
+  if (newItems.length > 0) {
+    const { error } = await client.from("news_items").insert(newItems);
+    if (error) throw new Error(`批量插入新闻失败: ${error.message}`);
   }
 
   return urlToId;

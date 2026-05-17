@@ -84,9 +84,10 @@ export interface SearchResult {
 const SEARXNG_INSTANCES = [
   "https://search.sapti.me",
   "https://searxng.ch",
-  
   "https://searx.be",
-  
+  "https://search.inetol.net",
+  "https://searx.tuxcloud.net",
+  "https://search.ononoki.org",
 ];
 
 /**
