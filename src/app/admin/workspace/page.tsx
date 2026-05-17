@@ -42,6 +42,12 @@ interface GenerateResult {
   newsCount?: number;
 }
 
+interface CollectLog {
+  type: 'info' | 'step' | 'success' | 'error' | 'stats';
+  message: string;
+  timestamp: string;
+}
+
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
@@ -104,6 +110,9 @@ export default function WorkspacePage() {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [generating, setGenerating] = useState<'collect' | 'daily' | 'weekly' | 'leaderboard' | null>(null);
   const [generateResult, setGenerateResult] = useState<GenerateResult | null>(null);
+  const [collectLogs, setCollectLogs] = useState<CollectLog[]>([]);
+  const [collectStreaming, setCollectStreaming] = useState(false);
+  const collectAbortRef = useRef<AbortController | null>(null);
   const [filterCategory, setFilterCategory] = useState('all');
   const [filterLevel, setFilterLevel] = useState('all');
   const [activeTab, setActiveTab] = useState<TabType>('all');
@@ -323,6 +332,105 @@ export default function WorkspacePage() {
     finally { setGenerating(null); }
   };
 
+  // ─── Streaming Collect ─────────────────────────────────────────
+
+  const addCollectLog = (type: CollectLog['type'], message: string) => {
+    const ts = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+    setCollectLogs(prev => [...prev, { type, message, timestamp: ts }]);
+  };
+
+  const triggerCollectStream = async () => {
+    if (collectStreaming) return;
+    setCollectLogs([]);
+    setCollectStreaming(true);
+    setGenerateResult(null);
+
+    const controller = new AbortController();
+    collectAbortRef.current = controller;
+
+    try {
+      addCollectLog('info', '正在连接收集服务...');
+      const res = await fetch('/api/news/collect?stream=1', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        addCollectLog('error', `连接失败: HTTP ${res.status}`);
+        return;
+      }
+
+      const reader = res.body?.getReader();
+      if (!reader) {
+        addCollectLog('error', '无法读取响应流');
+        return;
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith('data: ')) continue;
+          const jsonStr = trimmed.slice(6).trim();
+          if (!jsonStr || jsonStr === '[DONE]') continue;
+
+          try {
+            const event = JSON.parse(jsonStr);
+            if (event.type === 'progress' || event.type === 'step') {
+              addCollectLog('step', event.message || JSON.stringify(event));
+            } else if (event.type === 'info') {
+              addCollectLog('info', event.message || '');
+            } else if (event.type === 'success') {
+              addCollectLog('success', event.message || '收集完成');
+              if (event.newsCount !== undefined) {
+                addCollectLog('stats', `共收集 ${event.newsCount} 条新闻`);
+              }
+            } else if (event.type === 'error') {
+              addCollectLog('error', event.message || '发生错误');
+            } else if (event.type === 'done') {
+              if (event.newsCount !== undefined) {
+                addCollectLog('stats', `最终结果: ${event.newsCount} 条新闻入库`);
+              }
+              setGenerateResult({
+                success: true,
+                message: event.message || '收集完成',
+                newsCount: event.newsCount,
+              });
+            }
+          } catch {
+            // Not JSON, treat as plain text log
+            if (jsonStr.trim()) addCollectLog('info', jsonStr.trim());
+          }
+        }
+      }
+    } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        addCollectLog('info', '已取消收集');
+      } else {
+        addCollectLog('error', `连接错误: ${err instanceof Error ? err.message : '未知错误'}`);
+      }
+    } finally {
+      setCollectStreaming(false);
+      collectAbortRef.current = null;
+      await loadNews();
+      await loadPending();
+    }
+  };
+
+  const cancelCollect = () => {
+    collectAbortRef.current?.abort();
+  };
+
   // ─── Chat Actions (quick actions that show in chat) ──────────────
 
   function getActionLabel(type: string) {
@@ -436,8 +544,8 @@ export default function WorkspacePage() {
           try {
             const event = JSON.parse(jsonStr);
 
-            if (event.type === 'content' && event.content) {
-              assistantContent += event.content;
+            if (event.type === 'content' && event.text) {
+              assistantContent += event.text;
               setMessages(prev => {
                 const updated = [...prev];
                 const last = updated[updated.length - 1];
@@ -458,8 +566,8 @@ export default function WorkspacePage() {
               });
             } else if (event.type === 'action_result') {
               actionResult = {
-                success: event.success ?? false,
-                message: event.message ?? '',
+                success: event.result?.success ?? false,
+                message: event.result?.message ?? '',
               };
             } else if (event.type === 'done') {
               // Finalize
@@ -575,16 +683,16 @@ export default function WorkspacePage() {
       <div className="bg-card rounded-lg border border-border p-6">
         <h2 className="text-lg font-semibold text-foreground mb-4">手动触发生成</h2>
         <div className="flex flex-wrap gap-3">
-          <button onClick={() => triggerGenerate('collect')} disabled={generating !== null} className="px-5 py-2.5 bg-primary text-primary-foreground rounded-md font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-            {generating === 'collect' ? '收集中...' : '收集资讯'}
+          <button onClick={() => triggerCollectStream()} disabled={generating !== null || collectStreaming} className="px-5 py-2.5 bg-primary text-primary-foreground rounded-md font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            {collectStreaming ? '收集中...' : '收集资讯'}
           </button>
-          <button onClick={() => triggerGenerate('daily')} disabled={generating !== null} className="px-5 py-2.5 bg-muted text-foreground rounded-md font-medium hover:bg-muted/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+          <button onClick={() => triggerGenerate('daily')} disabled={generating !== null || collectStreaming} className="px-5 py-2.5 bg-muted text-foreground rounded-md font-medium hover:bg-muted/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
             {generating === 'daily' ? '生成中...' : '生成日报'}
           </button>
-          <button onClick={() => triggerGenerate('weekly')} disabled={generating !== null} className="px-5 py-2.5 bg-muted text-foreground rounded-md font-medium hover:bg-muted/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+          <button onClick={() => triggerGenerate('weekly')} disabled={generating !== null || collectStreaming} className="px-5 py-2.5 bg-muted text-foreground rounded-md font-medium hover:bg-muted/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
             {generating === 'weekly' ? '生成中...' : '生成周报'}
           </button>
-          <button onClick={() => triggerGenerate('leaderboard')} disabled={generating !== null} className="px-5 py-2.5 bg-muted text-foreground rounded-md font-medium hover:bg-muted/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+          <button onClick={() => triggerGenerate('leaderboard')} disabled={generating !== null || collectStreaming} className="px-5 py-2.5 bg-muted text-foreground rounded-md font-medium hover:bg-muted/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
             {generating === 'leaderboard' ? '更新中...' : '更新排行榜'}
           </button>
         </div>
@@ -597,6 +705,57 @@ export default function WorkspacePage() {
         )}
         <p className="text-muted-foreground text-xs mt-3">提示: 「收集资讯」仅搜索和入库新闻，不生成日报；「生成日报」会自动发布pending新闻并生成AI日报文章。</p>
       </div>
+
+      {/* Collect Progress Console */}
+      {(collectStreaming || collectLogs.length > 0) && (
+        <div className="bg-card rounded-lg border border-border overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/50">
+            <div className="flex items-center gap-2">
+              <Terminal className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium text-foreground">收集进度</span>
+              {collectStreaming && (
+                <span className="flex items-center gap-1.5 text-xs text-primary">
+                  <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                  运行中
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {collectStreaming && (
+                <button onClick={cancelCollect} className="px-3 py-1 text-xs border border-destructive/30 text-destructive rounded hover:bg-destructive/10 transition-colors">
+                  取消
+                </button>
+              )}
+              {!collectStreaming && collectLogs.length > 0 && (
+                <button onClick={() => setCollectLogs([])} className="px-3 py-1 text-xs border border-border text-muted-foreground rounded hover:text-foreground transition-colors">
+                  清除
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="p-4 max-h-64 overflow-y-auto font-mono text-xs leading-relaxed space-y-0.5">
+            {collectLogs.map((log, i) => (
+              <div key={i} className="flex gap-2">
+                <span className="text-muted-foreground/60 shrink-0 select-none">{log.timestamp}</span>
+                <span className={`${
+                  log.type === 'step' ? 'text-blue-600 dark:text-blue-400' :
+                  log.type === 'success' ? 'text-green-600 dark:text-green-400' :
+                  log.type === 'error' ? 'text-red-600 dark:text-red-400' :
+                  log.type === 'stats' ? 'text-amber-600 dark:text-amber-400 font-semibold' :
+                  'text-muted-foreground'
+                }`}>
+                  {log.type === 'error' ? '✕ ' : log.type === 'success' ? '✓ ' : log.type === 'stats' ? '▶ ' : log.type === 'step' ? '▸ ' : '  '}{log.message}
+                </span>
+              </div>
+            ))}
+            {collectStreaming && (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <span className="w-1.5 h-4 bg-primary animate-pulse rounded-sm" />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="bg-card rounded-lg border border-border p-6">
