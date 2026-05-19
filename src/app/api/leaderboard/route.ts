@@ -6,10 +6,10 @@ import { getLeaderboard } from "@/lib/services/db-service";
  * 获取大模型排行榜
  *
  * 查询参数：
- * - source: 数据来源，默认"datalearner-aa"
+ * - source: 数据来源，默认"datalearner-comprehensive"
  */
 
-// 数据来源配置 — source 对应数据库中的 source + category 组合
+// 数据来源配置
 export const LEADERBOARD_SOURCES: Record<
   string,
   {
@@ -21,56 +21,26 @@ export const LEADERBOARD_SOURCES: Record<
     dbCategory: string;
   }
 > = {
-  "datalearner-aa": {
-    label: "AA 智能指数",
-    url: "https://www.datalearner.com/leaderboards/external/aa-quality-index",
-    description:
-      "Artificial Analysis 智能指数，汇总编程、数学、科学、推理等10项标准化评测的综合分数",
-    metric: "综合分数",
-    dbSource: "datalearner",
-    dbCategory: "aa-index",
-  },
-  "datalearner-lmarena": {
-    label: "LMArena 文本生成榜",
-    url: "https://www.datalearner.com/leaderboards/external/text-generation",
-    description:
-      "基于匿名众包A/B对战的Elo评分，反映真实用户对回答质量的偏好",
-    metric: "Elo 评分",
-    dbSource: "datalearner",
-    dbCategory: "lmarena",
-  },
   "datalearner-comprehensive": {
-    label: "多基准综合评测",
+    label: "综合排行榜",
     url: "https://www.datalearner.com/leaderboards",
-    description:
-      "聚合HLE、ARC-AGI-2、FrontierMath、SWE-bench等多维评测排名",
+    description: "基于HLE、ARC-AGI-2等多维评测的综合排名",
     metric: "HLE 分数",
     dbSource: "datalearner",
     dbCategory: "comprehensive",
   },
-  "datalearner-math": {
-    label: "数学能力",
-    url: "https://www.datalearner.com/leaderboards/category/math",
-    description:
-      "基于FrontierMath等数学基准评测排名",
-    metric: "FrontierMath 分数",
-    dbSource: "datalearner",
-    dbCategory: "math",
-  },
   "datalearner-code": {
-    label: "编程能力",
+    label: "编程能力排行榜",
     url: "https://www.datalearner.com/leaderboards/category/code",
-    description:
-      "基于SWE-bench Verified等编程基准评测排名",
+    description: "基于SWE-bench Verified等编程基准评测排名",
     metric: "SWE-bench 分数",
     dbSource: "datalearner",
     dbCategory: "code",
   },
   "datalearner-agent": {
-    label: "Agent 能力",
+    label: "Agent 能力排行榜",
     url: "https://www.datalearner.com/leaderboards/category/agent",
-    description:
-      "基于τ²-Bench等Agent基准评测排名",
+    description: "基于τ²-Bench等Agent基准评测排名",
     metric: "τ²-Bench 分数",
     dbSource: "datalearner",
     dbCategory: "agent",
@@ -84,7 +54,7 @@ export function getLeaderboardSourceKeys(): string[] {
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
-  const sourceKey = searchParams.get("source") || "datalearner-aa";
+  const sourceKey = searchParams.get("source") || "datalearner-comprehensive";
 
   const sourceConfig = LEADERBOARD_SOURCES[sourceKey];
   if (!sourceConfig) {

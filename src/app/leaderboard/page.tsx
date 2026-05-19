@@ -7,12 +7,9 @@ import { ArrowUp, ArrowDown, Minus, RefreshCw, ExternalLink, Trophy, Loader2 } f
 
 // Tab 配置 — 每个tab对应一个 sourceKey，直接映射后端
 const TABS = [
-  { key: 'datalearner-aa', label: 'AA 智能指数', metric: 'AA Intelligence Index', source: 'datalearner', url: 'https://www.datalearner.com/leaderboards' },
-  { key: 'datalearner-lmarena', label: 'LMArena 投票', metric: 'Elo Rating', source: 'datalearner', url: 'https://www.datalearner.com/leaderboards/external/text-generation' },
-  { key: 'datalearner-comprehensive', label: '综合评测', metric: 'HLE Score', source: 'datalearner', url: 'https://www.datalearner.com/leaderboards' },
-  { key: 'datalearner-math', label: '数学能力', metric: 'FrontierMath', source: 'datalearner', url: 'https://www.datalearner.com/leaderboards/category/math' },
-  { key: 'datalearner-code', label: '编程能力', metric: 'SWE-bench Verified', source: 'datalearner', url: 'https://www.datalearner.com/leaderboards/category/code' },
-  { key: 'datalearner-agent', label: 'Agent能力', metric: 'τ²-Bench', source: 'datalearner', url: 'https://www.datalearner.com/leaderboards/category/agent' },
+  { key: 'datalearner-comprehensive', label: '综合排行榜', metric: 'HLE 分数', source: 'datalearner', url: 'https://www.datalearner.com/leaderboards' },
+  { key: 'datalearner-code', label: '编程能力', metric: 'SWE-bench 分数', source: 'datalearner', url: 'https://www.datalearner.com/leaderboards' },
+  { key: 'datalearner-agent', label: 'Agent能力', metric: 'τ²-Bench 分数', source: 'datalearner', url: 'https://www.datalearner.com/leaderboards' },
 ] as const;
 
 type TabKey = typeof TABS[number]['key'];
@@ -24,7 +21,7 @@ function RankChange({ change }: { change: number }) {
 }
 
 export default function LeaderboardPage() {
-  const [activeTab, setActiveTab] = useState<TabKey>('datalearner-aa');
+  const [activeTab, setActiveTab] = useState<TabKey>('datalearner-comprehensive');
   const [data, setData] = useState<LeaderboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
