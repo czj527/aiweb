@@ -507,6 +507,68 @@ export async function fetchJuyaFeed(): Promise<SearchResult[]> {
 }
 
 /**
+ * 获取橘鸦AI早报的完整内容（用于日报展示）
+ * 返回完整的HTML内容，保留原始格式
+ */
+export async function fetchJuyaDailyReport(): Promise<{
+  title: string;
+  date: string;
+  content: string;
+  issueNumber: number;
+} | null> {
+  const JUYA_RSS_URL = "https://imjuya.github.io/juya-ai-daily/rss.xml";
+  const parser = createParser();
+
+  try {
+    const parsed = await parser.parseURL(JUYA_RSS_URL);
+    if (!parsed.items || parsed.items.length === 0) {
+      console.log("[Juya] RSS: 0 items");
+      return null;
+    }
+
+    // 只取最新的一条
+    const latestItem = parsed.items[0];
+    const contentEncoded =
+      (latestItem as Record<string, unknown>)["content:encoded"] as string ||
+      latestItem.content ||
+      "";
+    const title = latestItem.title || "AI 早报";
+    const pubDate = latestItem.isoDate || latestItem.pubDate || new Date().toISOString();
+
+    if (!contentEncoded) {
+      console.warn("[Juya] No content:encoded found");
+      return null;
+    }
+
+    // 从标题中提取期号，如 "AI 早报 2026-05-19 #95" -> 95
+    const issueMatch = title.match(/#(\d+)/);
+    const issueNumber = issueMatch ? parseInt(issueMatch[1], 10) : 0;
+
+    // 从URL中提取日期，格式为 YYYY-MM-DD
+    const dateMatch = pubDate.match(/(\d{4}-\d{2}-\d{2})/);
+    const date = dateMatch ? dateMatch[1] : new Date().toISOString().slice(0, 10);
+
+    // 清理HTML内容，保留原始格式
+    const cleanContent = contentEncoded
+      .replace(/<!\[CDATA\[/g, "")
+      .replace(/\]\]>/g, "")
+      .trim();
+
+    console.log(`[Juya] Fetched daily report: ${title}`);
+    return {
+      title,
+      date,
+      content: cleanContent,
+      issueNumber,
+    };
+  } catch (e) {
+    const errMsg = e instanceof Error ? e.message : "Unknown error";
+    console.warn(`[Juya] RSS fetch failed: ${errMsg}`);
+    return null;
+  }
+}
+
+/**
  * 按优先级获取RSS源
  * SSS级先获取，不足时再获取SS级，以此类推
  */

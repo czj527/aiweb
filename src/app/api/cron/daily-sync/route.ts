@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { fetchJuyaFeed } from "@/lib/services/rss-fetch-service";
+import { fetchJuyaFeed, fetchJuyaDailyReport } from "@/lib/services/rss-fetch-service";
 import {
   deduplicateResults,
   dedupAgainstDatabase,
   convertJuyaResults,
   filterNews,
-  generateDailyArticle,
   extractHotTopics,
 } from "@/lib/services/processor";
 import {
@@ -14,7 +13,6 @@ import {
   getDailyReportByDate,
   createGenerationLog,
   updateGenerationLog,
-  getRecentNews,
 } from "@/lib/services/db-service";
 
 /**
@@ -22,11 +20,10 @@ import {
  * 每日自动同步：采集橘鸦RSS → 生成日报
  *
  * 流程：
- * 1. 获取橘鸦RSS最新内容
- * 2. 去重 + 过滤
- * 3. 入库
- * 4. 生成日报文章
- * 5. 创建日报记录
+ * 1. 获取橘鸦RSS完整日报内容
+ * 2. 获取单条新闻用于首页展示
+ * 3. 去重 + 入库
+ * 4. 创建日报记录（使用橘鸦原始内容）
  *
  * 可选 body 参数：
  * - date: 指定日期 (YYYY-MM-DD)，默认今天
@@ -82,106 +79,67 @@ function handleStreamSync(targetDate: string, force: boolean) {
           }
         }
 
-        // Step 1: 获取橘鸦RSS
-        send({ type: "step", message: "正在获取橘鸦AI早报RSS..." });
-        console.log("[Daily-Sync] Step 1: Fetching 橘鸦 RSS");
-        const juyaResults = await fetchJuyaFeed();
-        send({ type: "progress", layer: "rss", count: juyaResults.length });
-        console.log(`[Daily-Sync] 橘鸦 collected: ${juyaResults.length} articles`);
+        // Step 1: 获取橘鸦完整日报
+        send({ type: "step", message: "正在获取橘鸦AI早报..." });
+        console.log("[Daily-Sync] Step 1: Fetching 橘鸦 daily report");
+        const juyaReport = await fetchJuyaDailyReport();
 
-        if (juyaResults.length === 0) {
+        if (!juyaReport) {
           send({ type: "error", message: "橘鸦RSS暂无更新" });
           await updateGenerationLog(logId, { status: "empty", errorMessage: "No new content from RSS" });
           controller.close();
           return;
         }
 
-        // Step 2: 去重
-        send({ type: "step", message: "去重中..." });
-        console.log("[Daily-Sync] Step 2: Deduplicating");
-        const dedupedResults = deduplicateResults(juyaResults);
-        console.log(`[Daily-Sync] After dedup: ${dedupedResults.length}`);
+        send({ type: "progress", title: juyaReport.title, date: juyaReport.date });
+        console.log(`[Daily-Sync] Got report: ${juyaReport.title}`);
 
-        // Step 3: 72小时数据库去重
-        const freshResults = await dedupAgainstDatabase(dedupedResults, 72);
-        console.log(`[Daily-Sync] After 72h DB dedup: ${freshResults.length}`);
+        // Step 2: 获取单条新闻用于首页展示
+        send({ type: "step", message: "正在解析新闻条目..." });
+        console.log("[Daily-Sync] Step 2: Fetching individual news items");
+        const juyaResults = await fetchJuyaFeed();
+        console.log(`[Daily-Sync] Got ${juyaResults.length} news items`);
 
-        // Step 4: 直接转换（橘鸦内容已审核，跳过AI处理）
-        send({ type: "step", message: "处理中..." });
-        console.log("[Daily-Sync] Step 4: Converting 橘鸦 results");
-        const juyaProcessed = convertJuyaResults(freshResults);
-        console.log(`[Daily-Sync] Converted: ${juyaProcessed.length} items`);
+        // Step 3: 去重 + 入库
+        if (juyaResults.length > 0) {
+          send({ type: "step", message: "去重入库中..." });
+          console.log("[Daily-Sync] Step 3: Deduplicating and saving");
+          const dedupedResults = deduplicateResults(juyaResults);
+          const freshResults = await dedupAgainstDatabase(dedupedResults, 72);
+          const juyaProcessed = convertJuyaResults(freshResults);
+          const filtered = filterNews(juyaProcessed);
+          await upsertNewsItems(filtered);
+          console.log(`[Daily-Sync] Saved ${filtered.length} news items`);
+        }
 
-        // Step 5: 过滤
-        const filtered = filterNews(juyaProcessed);
-        console.log(`[Daily-Sync] After filter: ${filtered.length} items`);
+        // Step 4: 提取热门话题
+        const hotTopics = extractHotTopics(convertJuyaResults(juyaResults));
 
-        // Step 6: 入库
-        send({ type: "step", message: "入库中..." });
-        console.log("[Daily-Sync] Step 6: Saving to database");
-        const urlToId = await upsertNewsItems(filtered);
-        console.log(`[Daily-Sync] Saved ${filtered.length} items`);
-
-        // Step 7: 获取今日所有新闻（包括之前入库的）用于生成日报
-        send({ type: "step", message: "生成日报文章..." });
-        console.log("[Daily-Sync] Step 7: Generating daily article");
-        const recentNews = await getRecentNews(24, 50);
-        const allNews = recentNews.map(n => ({
-          title: n.title,
-          summary: n.summary || "",
-          quote: "",
-          sourceName: n.source_name || "橘鸦AI早报",
-          sourceUrl: n.source_url || "",
-          category: (n.category || "industry") as "model" | "agent" | "opensource" | "product" | "research" | "industry" | "policy" | "rumor",
-          importanceScore: n.importance_score || 15,
-          importanceLevel: n.importance_level || "S",
-          keywords: (n.keywords as string[]) || [],
-          isAIRelated: n.is_ai_related !== false,
-          publishedAt: n.published_at || new Date().toISOString(),
-          isBreaking: false,
-        }));
-
-        // 按分数排序
-        allNews.sort((a, b) => b.importanceScore - a.importanceScore);
-
-        // 生成日报文章
-        const overview = await generateDailyArticle(allNews);
-        const hotTopics = extractHotTopics(allNews);
-
-        // Step 8: 创建日报记录
+        // Step 5: 创建日报记录（使用橘鸦原始内容）
         send({ type: "step", message: "保存日报..." });
-        console.log("[Daily-Sync] Step 8: Creating daily report");
-        const newsIds = allNews
-          .map(n => {
-            // 尝试从urlToId获取ID
-            for (const [url, id] of urlToId.entries()) {
-              if (url === n.sourceUrl) return id;
-            }
-            return null;
-          })
-          .filter((id): id is string => !!id);
-
-        const reportId = await createDailyReport(targetDate, overview, hotTopics, newsIds);
+        console.log("[Daily-Sync] Step 5: Creating daily report");
+        const reportId = await createDailyReport(
+          targetDate,
+          juyaReport.content, // 使用橘鸦的完整HTML内容
+          hotTopics,
+          [] // 不关联单独的新闻条目
+        );
         console.log(`[Daily-Sync] Report created: ${reportId}`);
 
         await updateGenerationLog(logId, {
           status: "success",
           discoveredCount: juyaResults.length,
-          afterDedupCount: dedupedResults.length,
-          afterFilterCount: filtered.length,
+          afterDedupCount: juyaResults.length,
+          afterFilterCount: juyaResults.length,
         });
 
         send({
           type: "done",
           success: true,
           reportId,
-          newsCount: filtered.length,
+          newsCount: juyaResults.length,
           date: targetDate,
-          stats: {
-            discovered: juyaResults.length,
-            afterDedup: dedupedResults.length,
-            afterFilter: filtered.length,
-          },
+          title: juyaReport.title,
         });
       } catch (e) {
         const errorMessage = e instanceof Error ? e.message : "Unknown error";
@@ -220,93 +178,59 @@ async function handleJsonSync(targetDate: string, force: boolean) {
       }
     }
 
-    // Step 1: 获取橘鸦RSS
-    console.log("[Daily-Sync] Step 1: Fetching 橘鸦 RSS");
-    const juyaResults = await fetchJuyaFeed();
-    console.log(`[Daily-Sync] 橘鸦 collected: ${juyaResults.length} articles`);
+    // Step 1: 获取橘鸦完整日报
+    console.log("[Daily-Sync] Step 1: Fetching 橘鸦 daily report");
+    const juyaReport = await fetchJuyaDailyReport();
 
-    if (juyaResults.length === 0) {
+    if (!juyaReport) {
       await updateGenerationLog(logId, { status: "empty", errorMessage: "No new content from RSS" });
       return NextResponse.json({ success: true, newsCount: 0, message: "橘鸦RSS暂无更新" });
     }
 
-    // Step 2: 去重
-    console.log("[Daily-Sync] Step 2: Deduplicating");
-    const dedupedResults = deduplicateResults(juyaResults);
-    console.log(`[Daily-Sync] After dedup: ${dedupedResults.length}`);
+    console.log(`[Daily-Sync] Got report: ${juyaReport.title}`);
 
-    // Step 3: 72小时数据库去重
-    const freshResults = await dedupAgainstDatabase(dedupedResults, 72);
-    console.log(`[Daily-Sync] After 72h DB dedup: ${freshResults.length}`);
+    // Step 2: 获取单条新闻用于首页展示
+    console.log("[Daily-Sync] Step 2: Fetching individual news items");
+    const juyaResults = await fetchJuyaFeed();
+    console.log(`[Daily-Sync] Got ${juyaResults.length} news items`);
 
-    // Step 4: 直接转换（橘鸦内容已审核，跳过AI处理）
-    console.log("[Daily-Sync] Step 4: Converting 橘鸦 results");
-    const juyaProcessed = convertJuyaResults(freshResults);
-    console.log(`[Daily-Sync] Converted: ${juyaProcessed.length} items`);
+    // Step 3: 去重 + 入库
+    if (juyaResults.length > 0) {
+      console.log("[Daily-Sync] Step 3: Deduplicating and saving");
+      const dedupedResults = deduplicateResults(juyaResults);
+      const freshResults = await dedupAgainstDatabase(dedupedResults, 72);
+      const juyaProcessed = convertJuyaResults(freshResults);
+      const filtered = filterNews(juyaProcessed);
+      await upsertNewsItems(filtered);
+      console.log(`[Daily-Sync] Saved ${filtered.length} news items`);
+    }
 
-    // Step 5: 过滤
-    const filtered = filterNews(juyaProcessed);
-    console.log(`[Daily-Sync] After filter: ${filtered.length} items`);
+    // Step 4: 提取热门话题
+    const hotTopics = extractHotTopics(convertJuyaResults(juyaResults));
 
-    // Step 6: 入库
-    console.log("[Daily-Sync] Step 6: Saving to database");
-    const urlToId = await upsertNewsItems(filtered);
-    console.log(`[Daily-Sync] Saved ${filtered.length} items`);
-
-    // Step 7: 获取今日所有新闻用于生成日报
-    console.log("[Daily-Sync] Step 7: Generating daily article");
-    const recentNews = await getRecentNews(24, 50);
-    const allNews = recentNews.map(n => ({
-      title: n.title,
-      summary: n.summary || "",
-      quote: "",
-      sourceName: n.source_name || "橘鸦AI早报",
-      sourceUrl: n.source_url || "",
-      category: (n.category || "industry") as "model" | "agent" | "opensource" | "product" | "research" | "industry" | "policy" | "rumor",
-      importanceScore: n.importance_score || 15,
-      importanceLevel: n.importance_level || "S",
-      keywords: (n.keywords as string[]) || [],
-      isAIRelated: n.is_ai_related !== false,
-      publishedAt: n.published_at || new Date().toISOString(),
-      isBreaking: false,
-    }));
-
-    allNews.sort((a, b) => b.importanceScore - a.importanceScore);
-
-    const overview = await generateDailyArticle(allNews);
-    const hotTopics = extractHotTopics(allNews);
-
-    // Step 8: 创建日报记录
-    console.log("[Daily-Sync] Step 8: Creating daily report");
-    const newsIds = allNews
-      .map(n => {
-        for (const [url, id] of urlToId.entries()) {
-          if (url === n.sourceUrl) return id;
-        }
-        return null;
-      })
-      .filter((id): id is string => !!id);
-
-    const reportId = await createDailyReport(targetDate, overview, hotTopics, newsIds);
+    // Step 5: 创建日报记录（使用橘鸦原始内容）
+    console.log("[Daily-Sync] Step 5: Creating daily report");
+    const reportId = await createDailyReport(
+      targetDate,
+      juyaReport.content, // 使用橘鸦的完整HTML内容
+      hotTopics,
+      [] // 不关联单独的新闻条目
+    );
     console.log(`[Daily-Sync] Report created: ${reportId}`);
 
     await updateGenerationLog(logId, {
       status: "success",
       discoveredCount: juyaResults.length,
-      afterDedupCount: dedupedResults.length,
-      afterFilterCount: filtered.length,
+      afterDedupCount: juyaResults.length,
+      afterFilterCount: juyaResults.length,
     });
 
     return NextResponse.json({
       success: true,
       reportId,
-      newsCount: filtered.length,
+      newsCount: juyaResults.length,
       date: targetDate,
-      stats: {
-        discovered: juyaResults.length,
-        afterDedup: dedupedResults.length,
-        afterFilter: filtered.length,
-      },
+      title: juyaReport.title,
     });
   } catch (e) {
     const errorMessage = e instanceof Error ? e.message : "Unknown error";

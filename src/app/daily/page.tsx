@@ -29,11 +29,45 @@ interface DailyListItem {
 type ViewMode = 'latest' | 'archive';
 
 /**
- * 简易 Markdown 渲染器
- * 支持 ## / ### 标题、**加粗**、段落分隔
+ * 内容渲染器
+ * 支持HTML（橘鸦格式）和Markdown
  */
-function renderMarkdown(md: string): string {
-  return md
+function renderContent(content: string): string {
+  // 检测是否为HTML内容（橘鸦格式）
+  if (content.includes('<h2>') || content.includes('<h3>') || content.includes('<blockquote>')) {
+    // 橘鸦HTML格式：添加样式类
+    return content
+      // h1 标题
+      .replace(/<h1>(.*?)<\/h1>/g, '<h1 class="text-3xl font-bold font-display text-foreground mb-6 tracking-tight">$1</h1>')
+      // h2 标题（新闻标题）
+      .replace(/<h2>(.*?)<\/h2>/g, '<h2 class="text-xl font-bold font-display text-foreground mt-10 mb-4 tracking-tight border-b border-border/30 pb-3">$1</h2>')
+      // h3 标题（分类标题）
+      .replace(/<h3>(.*?)<\/h3>/g, '<h3 class="text-lg font-bold font-display text-foreground mt-8 mb-3 tracking-tight text-primary">$1</h3>')
+      // blockquote（引用摘要）
+      .replace(/<blockquote>([\s\S]*?)<\/blockquote>/g, '<blockquote class="border-l-4 border-primary/30 pl-4 py-2 my-4 bg-primary/5 rounded-r-lg italic text-foreground/80">$1</blockquote>')
+      // 段落
+      .replace(/<p>(.*?)<\/p>/g, '<p class="text-[15px] text-foreground/85 leading-[1.85] mb-3">$1</p>')
+      // 列表项
+      .replace(/<li>(.*?)<\/li>/g, '<li class="text-[15px] text-foreground/85 leading-[1.85] mb-1 ml-4">$1</li>')
+      // 无序列表
+      .replace(/<ul>([\s\S]*?)<\/ul>/g, '<ul class="list-disc mb-4">$1</ul>')
+      // 有序列表
+      .replace(/<ol>([\s\S]*?)<\/ol>/g, '<ol class="list-decimal mb-4">$1</ol>')
+      // 分隔线
+      .replace(/<hr\s*\/?>/g, '<hr class="border-border/30 my-8" />')
+      // 链接
+      .replace(/<a href="(.*?)">(.*?)<\/a>/g, '<a href="$1" class="text-primary hover:underline" target="_blank" rel="noopener noreferrer">$2</a>')
+      // 加粗
+      .replace(/<strong>(.*?)<\/strong>/g, '<strong class="font-semibold text-foreground">$1</strong>')
+      // 行内代码
+      .replace(/<code>(.*?)<\/code>/g, '<code class="px-1.5 py-0.5 bg-muted rounded text-sm font-mono text-primary">$1</code>')
+      // 图片
+      .replace(/<img src="(.*?)" alt="(.*?)"\s*\/?>/g, '<img src="$1" alt="$2" class="max-w-full h-auto rounded-lg my-4 shadow-sm" />')
+      .replace(/<img src="(.*?)"\s*\/?>/g, '<img src="$1" class="max-w-full h-auto rounded-lg my-4 shadow-sm" />');
+  }
+
+  // Markdown格式（兼容旧格式）
+  return content
     .split('\n')
     .map((line) => {
       const trimmed = line.trim();
@@ -256,11 +290,11 @@ export default function DailyPage() {
                   </div>
                 </header>
 
-                {/* 文章正文 - Markdown 渲染 */}
+                {/* 文章正文 - 渲染橘鸦格式或Markdown */}
                 {report.overview && (
                   <div
                     className="prose-custom"
-                    dangerouslySetInnerHTML={{ __html: renderMarkdown(report.overview) }}
+                    dangerouslySetInnerHTML={{ __html: renderContent(report.overview) }}
                   />
                 )}
               </article>
