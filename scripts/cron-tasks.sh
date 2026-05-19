@@ -53,10 +53,10 @@ fetch_leaderboard() {
 # 更新所有排行榜
 update_leaderboard() {
   log "cron: 开始更新所有排行榜..."
-  local sources=("datalearner-aa" "datalearner-lmarena")
+  local sources=("datalearner-comprehensive" "datalearner-code" "datalearner-agent")
   for src in "${sources[@]}"; do
     fetch_leaderboard "$src"
-    sleep 2  # 避免请求过快
+    sleep 3  # 避免请求过快
   done
   log "cron: 排行榜全部更新完成"
 }

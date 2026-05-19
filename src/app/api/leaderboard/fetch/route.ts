@@ -40,13 +40,29 @@ const SOURCE_CONFIG: Record<
       "基于匿名众包A/B对战的Elo评分，反映真实用户对回答质量的偏好",
     fetchUrl: "https://www.datalearner.com/leaderboards/external/text-generation",
   },
-  "datalearner-benchmark": {
-    name: "多基准综合评测",
+  "datalearner-comprehensive": {
+    name: "综合排行榜",
     metric: "综合评分",
     url: "https://www.datalearner.com/leaderboards",
     description:
-      "聚合HLE、ARC-AGI-2、FrontierMath、SWE-bench Verified、τ²-Bench等多维评测排名",
+      "聚合HLE、ARC-AGI-2、FrontierMath、SWE-bench等多维评测排名",
     fetchUrl: "https://www.datalearner.com/leaderboards",
+  },
+  "datalearner-code": {
+    name: "编程能力排行榜",
+    metric: "SWE-bench 分数",
+    url: "https://www.datalearner.com/leaderboards/category/code",
+    description:
+      "基于SWE-bench Verified等编程基准评测排名",
+    fetchUrl: "https://www.datalearner.com/leaderboards/category/code",
+  },
+  "datalearner-agent": {
+    name: "Agent 能力排行榜",
+    metric: "τ²-Bench 分数",
+    url: "https://www.datalearner.com/leaderboards/category/agent",
+    description:
+      "基于τ²-Bench等Agent基准评测排名",
+    fetchUrl: "https://www.datalearner.com/leaderboards/category/agent",
   },
 };
 
@@ -54,7 +70,9 @@ const SOURCE_CONFIG: Record<
 const SOURCE_DB_MAP: Record<string, { dbSource: string; dbCategory: string }> = {
   "datalearner-aa": { dbSource: "datalearner", dbCategory: "aa-index" },
   "datalearner-lmarena": { dbSource: "datalearner", dbCategory: "lmarena" },
-  "datalearner-benchmark": { dbSource: "datalearner", dbCategory: "comprehensive" },
+  "datalearner-comprehensive": { dbSource: "datalearner", dbCategory: "comprehensive" },
+  "datalearner-code": { dbSource: "datalearner", dbCategory: "code" },
+  "datalearner-agent": { dbSource: "datalearner", dbCategory: "agent" },
 };
 
 export async function POST(request: Request) {
