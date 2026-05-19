@@ -50,6 +50,13 @@ const SOURCE_CONFIG: Record<
   },
 };
 
+// 数据源到数据库source/category的映射
+const SOURCE_DB_MAP: Record<string, { dbSource: string; dbCategory: string }> = {
+  "datalearner-aa": { dbSource: "datalearner", dbCategory: "aa-index" },
+  "datalearner-lmarena": { dbSource: "datalearner", dbCategory: "lmarena" },
+  "datalearner-benchmark": { dbSource: "datalearner", dbCategory: "comprehensive" },
+};
+
 export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const source = body.source || "datalearner-aa";
@@ -62,6 +69,9 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
+
+  // 获取数据库source和category
+  const dbMapping = SOURCE_DB_MAP[source] || { dbSource: "datalearner", dbCategory: "overall" };
 
   console.log(`[Leaderboard Fetch] 开始抓取 ${source}/${category}`);
 
@@ -123,7 +133,7 @@ export async function POST(request: Request) {
     }
 
     // Step 3: 写入数据库
-    await replaceLeaderboard(source, category, entries);
+    await replaceLeaderboard(dbMapping.dbSource, dbMapping.dbCategory, entries);
 
     console.log(
       `[Leaderboard Fetch] 完成 ${source}/${category}: ${entries.length} 条`
