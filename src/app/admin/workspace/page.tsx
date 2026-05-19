@@ -132,7 +132,7 @@ export default function WorkspacePage() {
   const [pendingCount, setPendingCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
-  const [generating, setGenerating] = useState<'collect' | 'daily' | 'weekly' | 'leaderboard' | null>(null);
+  const [generating, setGenerating] = useState<'collect' | 'daily' | 'weekly' | 'leaderboard' | 'daily-sync' | null>(null);
   const [generateResult, setGenerateResult] = useState<GenerateResult | null>(null);
   const [collectLogs, setCollectLogs] = useState<CollectLog[]>([]);
   const [collectStreaming, setCollectStreaming] = useState(false);
@@ -434,6 +434,184 @@ export default function WorkspacePage() {
 
   // ─── Generate Actions ────────────────────────────────────────────
 
+  const triggerDailySync = async () => {
+    setGenerating('daily-sync');
+    setGenerateResult(null);
+    setCollectLogs([]);
+    setCollectStreaming(true);
+
+    const controller = new AbortController();
+    collectAbortRef.current = controller;
+
+    try {
+      addCollectLog('info', '正在连接每日同步服务...');
+      const res = await fetch('/api/cron/daily-sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stream: true }),
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        addCollectLog('error', `连接失败: HTTP ${res.status}`);
+        return;
+      }
+
+      const reader = res.body?.getReader();
+      if (!reader) {
+        addCollectLog('error', '无法读取响应流');
+        return;
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith('data: ')) continue;
+          const jsonStr = trimmed.slice(6).trim();
+          if (!jsonStr || jsonStr === '[DONE]') continue;
+
+          try {
+            const event = JSON.parse(jsonStr);
+            if (event.type === 'progress' || event.type === 'step') {
+              addCollectLog('step', event.message || JSON.stringify(event));
+            } else if (event.type === 'info') {
+              addCollectLog('info', event.message || '');
+            } else if (event.type === 'success') {
+              addCollectLog('success', event.message || '同步完成');
+              if (event.newsCount !== undefined) {
+                addCollectLog('stats', `共收集 ${event.newsCount} 条新闻`);
+              }
+            } else if (event.type === 'error') {
+              addCollectLog('error', event.message || '发生错误');
+            } else if (event.type === 'done') {
+              if (event.newsCount !== undefined) {
+                addCollectLog('stats', `最终结果: ${event.newsCount} 条新闻入库`);
+              }
+              setGenerateResult({
+                success: true,
+                message: event.message || '每日同步完成',
+                newsCount: event.newsCount,
+              });
+            }
+          } catch {
+            // Not JSON, treat as plain text log
+            if (jsonStr.trim()) addCollectLog('info', jsonStr.trim());
+          }
+        }
+      }
+    } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        addCollectLog('info', '已取消同步');
+      } else {
+        addCollectLog('error', `连接错误: ${err instanceof Error ? err.message : '未知错误'}`);
+      }
+    } finally {
+      setCollectStreaming(false);
+      setGenerating(null);
+      collectAbortRef.current = null;
+      await loadNews();
+      await loadPending();
+    }
+  };
+
+  const triggerRssCollect = async () => {
+    setCollectLogs([]);
+    setCollectStreaming(true);
+    setGenerateResult(null);
+
+    const controller = new AbortController();
+    collectAbortRef.current = controller;
+
+    try {
+      addCollectLog('info', '正在采集橘鸦AI早报RSS...');
+      const res = await fetch('/api/rss/collect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stream: true }),
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        addCollectLog('error', `连接失败: HTTP ${res.status}`);
+        return;
+      }
+
+      const reader = res.body?.getReader();
+      if (!reader) {
+        addCollectLog('error', '无法读取响应流');
+        return;
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith('data: ')) continue;
+          const jsonStr = trimmed.slice(6).trim();
+          if (!jsonStr || jsonStr === '[DONE]') continue;
+
+          try {
+            const event = JSON.parse(jsonStr);
+            if (event.type === 'progress' || event.type === 'step') {
+              addCollectLog('step', event.message || JSON.stringify(event));
+            } else if (event.type === 'info') {
+              addCollectLog('info', event.message || '');
+            } else if (event.type === 'success') {
+              addCollectLog('success', event.message || '采集完成');
+              if (event.newsCount !== undefined) {
+                addCollectLog('stats', `共收集 ${event.newsCount} 条新闻`);
+              }
+            } else if (event.type === 'error') {
+              addCollectLog('error', event.message || '发生错误');
+            } else if (event.type === 'done') {
+              if (event.newsCount !== undefined) {
+                addCollectLog('stats', `最终结果: ${event.newsCount} 条新闻入库`);
+              }
+              setGenerateResult({
+                success: true,
+                message: event.message || 'RSS采集完成',
+                newsCount: event.newsCount,
+              });
+            }
+          } catch {
+            // Not JSON, treat as plain text log
+            if (jsonStr.trim()) addCollectLog('info', jsonStr.trim());
+          }
+        }
+      }
+    } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        addCollectLog('info', '已取消采集');
+      } else {
+        addCollectLog('error', `连接错误: ${err instanceof Error ? err.message : '未知错误'}`);
+      }
+    } finally {
+      setCollectStreaming(false);
+      collectAbortRef.current = null;
+      await loadNews();
+      await loadPending();
+    }
+  };
+
   const triggerGenerate = async (type: 'collect' | 'daily' | 'weekly' | 'leaderboard') => {
     setGenerating(type);
     setGenerateResult(null);
@@ -569,6 +747,8 @@ export default function WorkspacePage() {
       daily: '生成日报',
       weekly: '生成周报',
       leaderboard: '更新排行榜',
+      'daily-sync': '每日同步',
+      'rss-collect': '采集RSS',
     };
     return map[type] ?? type;
   }
@@ -581,10 +761,17 @@ export default function WorkspacePage() {
     try {
       let url = '';
       let body: Record<string, unknown> | undefined;
-      if (type === 'collect') url = '/api/news/collect';
-      else if (type === 'daily') url = '/api/daily/generate';
-      else if (type === 'weekly') url = '/api/weekly/generate';
-      else {
+      if (type === 'daily-sync') {
+        url = '/api/cron/daily-sync';
+      } else if (type === 'rss-collect') {
+        url = '/api/rss/collect';
+      } else if (type === 'collect') {
+        url = '/api/news/collect';
+      } else if (type === 'daily') {
+        url = '/api/daily/generate';
+      } else if (type === 'weekly') {
+        url = '/api/weekly/generate';
+      } else {
         url = '/api/leaderboard/fetch';
         body = { source: 'datalearner-aa' };
       }
@@ -813,14 +1000,14 @@ export default function WorkspacePage() {
       <div className="bg-card rounded-lg border border-border p-6">
         <h2 className="text-lg font-semibold text-foreground mb-4">手动触发生成</h2>
         <div className="flex flex-wrap gap-3">
-          <button onClick={() => triggerCollectStream()} disabled={generating !== null || collectStreaming} className="px-5 py-2.5 bg-primary text-primary-foreground rounded-md font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-            {collectStreaming ? '收集中...' : '收集资讯'}
+          <button onClick={() => triggerDailySync()} disabled={generating !== null || collectStreaming} className="px-5 py-2.5 bg-primary text-primary-foreground rounded-md font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            {generating === 'daily-sync' ? '同步中...' : '每日同步（RSS+日报）'}
+          </button>
+          <button onClick={() => triggerRssCollect()} disabled={generating !== null || collectStreaming} className="px-5 py-2.5 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            {collectStreaming ? '采集中...' : '仅采集RSS'}
           </button>
           <button onClick={() => triggerGenerate('daily')} disabled={generating !== null || collectStreaming} className="px-5 py-2.5 bg-muted text-foreground rounded-md font-medium hover:bg-muted/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-            {generating === 'daily' ? '生成中...' : '生成日报'}
-          </button>
-          <button onClick={() => triggerGenerate('weekly')} disabled={generating !== null || collectStreaming} className="px-5 py-2.5 bg-muted text-foreground rounded-md font-medium hover:bg-muted/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-            {generating === 'weekly' ? '生成中...' : '生成周报'}
+            {generating === 'daily' ? '生成中...' : '仅生成日报'}
           </button>
           <button onClick={() => triggerGenerate('leaderboard')} disabled={generating !== null || collectStreaming} className="px-5 py-2.5 bg-muted text-foreground rounded-md font-medium hover:bg-muted/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
             {generating === 'leaderboard' ? '更新中...' : '更新排行榜'}
@@ -833,7 +1020,7 @@ export default function WorkspacePage() {
               : `操作失败: ${generateResult.error || '未知错误'}`}
           </div>
         )}
-        <p className="text-muted-foreground text-xs mt-3">提示: 「收集资讯」仅搜索和入库新闻，不生成日报；「生成日报」会自动发布pending新闻并生成AI日报文章。</p>
+        <p className="text-muted-foreground text-xs mt-3">提示: 「每日同步」自动采集橘鸦RSS并生成日报（推荐）；「仅采集RSS」只采集不生成日报；「仅生成日报」使用已有数据生成。</p>
       </div>
 
       {/* Collect Progress Console */}
@@ -1056,8 +1243,8 @@ export default function WorkspacePage() {
             {/* Quick action buttons */}
             <div className="flex flex-wrap gap-2 mt-3">
               {[
-                { type: 'collect', label: '收集资讯', icon: Newspaper },
-                { type: 'daily', label: '生成日报', icon: Calendar },
+                { type: 'daily-sync', label: '每日同步', icon: Newspaper },
+                { type: 'rss-collect', label: '采集RSS', icon: Calendar },
               ].map(({ type, label, icon: Icon }) => (
                 <button
                   key={type}
@@ -1067,7 +1254,7 @@ export default function WorkspacePage() {
                   <Icon className="w-3.5 h-3.5" />
                   {label}
                 </button>
-              ))}
+              ))
             </div>
           </div>
         )}

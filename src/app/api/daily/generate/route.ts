@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { searchDateAI } from "@/lib/services/search-service";
-import { fetchMultipleURLs } from "@/lib/services/fetch-service";
+import { fetchJuyaFeed } from "@/lib/services/rss-fetch-service";
 import {
   deduplicateResults,
-  processWithAI,
+  dedupAgainstDatabase,
+  convertJuyaResults,
   filterNews,
-  generateDailyOverview,
+  generateDailyArticle,
   extractHotTopics,
 } from "@/lib/services/processor";
 import {
@@ -14,19 +14,22 @@ import {
   createGenerationLog,
   updateGenerationLog,
   getDailyReportByDate,
-  publishAllPendingNews,
+  getRecentNews,
 } from "@/lib/services/db-service";
 
 /**
  * POST /api/daily/generate
- * 触发日报生成：搜索 → 去重 → AI处理 → 入库
+ * 基于橘鸦RSS生成日报
  *
  * 可选 body 参数：
- * - date: 指定日期 (YYYY-MM-DD)，默认昨天
+ * - date: 指定日期 (YYYY-MM-DD)，默认今天
+ * - force: 强制重新生成（即使已存在）
  */
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
-  const targetDate = body.date || getYesterday();
+  const today = new Date().toISOString().slice(0, 10);
+  const targetDate = body.date || today;
+  const force = body.force === true;
 
   // 验证日期格式
   if (!/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
@@ -40,80 +43,103 @@ export async function POST(request: NextRequest) {
 
   try {
     // 检查是否已存在该日期的日报
-    const existing = await getDailyReportByDate(targetDate);
-    if (existing) {
-      await updateGenerationLog(logId, { status: "skipped", errorMessage: "Report already exists" });
-      return NextResponse.json({
-        success: true,
-        reportId: existing.id,
-        date: targetDate,
-        message: "该日期的日报已存在",
-      });
+    if (!force) {
+      const existing = await getDailyReportByDate(targetDate);
+      if (existing) {
+        await updateGenerationLog(logId, { status: "skipped", errorMessage: "Report already exists" });
+        return NextResponse.json({
+          success: true,
+          reportId: existing.id,
+          date: targetDate,
+          message: "该日期的日报已存在",
+        });
+      }
     }
 
-    // Step 0: 自动发布所有pending新闻（到时间自动发布，不管是否人工审核）
-    console.log(`[Daily] Step 0: Auto-publishing pending news`);
-    await publishAllPendingNews();
+    // Step 1: 获取橘鸦RSS
+    console.log(`[Daily] Step 1: Fetching 橘鸦 RSS`);
+    const juyaResults = await fetchJuyaFeed();
+    console.log(`[Daily] 橘鸦 collected: ${juyaResults.length} articles`);
 
-    // Step 1: 搜索AI相关新闻
-    console.log(`[Daily] Step 1: Searching AI news for ${targetDate}`);
-    const searchResults = await searchDateAI(targetDate);
-    const discoveredCount = searchResults.length;
+    if (juyaResults.length === 0) {
+      // 如果RSS没有新内容，尝试使用数据库中已有的新闻
+      console.log("[Daily] No new RSS content, using existing news from database");
+    }
 
-    // Step 2: 三层去重
-    console.log(`[Daily] Step 2: Deduplicating ${discoveredCount} results`);
-    const dedupedResults = deduplicateResults(searchResults);
-    const afterDedupCount = dedupedResults.length;
+    let filtered: Awaited<ReturnType<typeof convertJuyaResults>> = [];
 
-    // Step 3: 获取Top条目的详细内容（用于更精准的摘要）
-    console.log(`[Daily] Step 3: Fetching details for top ${Math.min(dedupedResults.length, 10)} items`);
-    const topUrls = dedupedResults.slice(0, 30).map((r) => r.url).filter(Boolean);
-    const fetchResults = await fetchMultipleURLs(topUrls, { concurrency: 5, maxLength: 5000 });
-    const fetchedMap = new Map(fetchResults.filter((r) => r.success).map((r) => [r.url, r]));
+    if (juyaResults.length > 0) {
+      // Step 2: 去重
+      console.log(`[Daily] Step 2: Deduplicating`);
+      const dedupedResults = deduplicateResults(juyaResults);
 
-    // Step 4: AI处理（分类 + 打分 + 摘要）
-    console.log(`[Daily] Step 4: Processing with AI`);
-    const processed = await processWithAI(dedupedResults, fetchedMap);
+      // Step 3: 72小时数据库去重
+      const freshResults = await dedupAgainstDatabase(dedupedResults, 72);
 
-    // Step 5: 过滤非AI和低质量内容
-    const filtered = filterNews(processed);
-    const afterFilterCount = filtered.length;
-    console.log(`[Daily] Step 5: After filter: ${afterFilterCount} items`);
+      // Step 4: 直接转换（橘鸦内容已审核，跳过AI处理）
+      console.log(`[Daily] Step 4: Converting 橘鸦 results`);
+      const juyaProcessed = convertJuyaResults(freshResults);
 
-    // Step 6: 入库
-    console.log(`[Daily] Step 6: Saving to database`);
-    const urlToId = await upsertNewsItems(filtered);
+      // Step 5: 过滤
+      filtered = filterNews(juyaProcessed);
+      console.log(`[Daily] After filter: ${filtered.length} items`);
 
-    // Step 7: 生成日报概览
-    console.log(`[Daily] Step 7: Generating daily overview`);
-    const overview = await generateDailyOverview(filtered);
-    const hotTopics = extractHotTopics(filtered);
+      // Step 6: 入库
+      console.log(`[Daily] Step 6: Saving to database`);
+      await upsertNewsItems(filtered);
+    }
+
+    // Step 7: 获取今日所有新闻用于生成日报
+    console.log(`[Daily] Step 7: Generating daily article`);
+    const recentNews = await getRecentNews(24, 50);
+    const allNews = recentNews.map(n => ({
+      title: n.title,
+      summary: n.summary,
+      quote: "",
+      sourceName: n.source_name || "橘鸦AI早报",
+      sourceUrl: n.source_url || "",
+      category: n.category || "industry",
+      importanceScore: n.importance_score || 15,
+      importanceLevel: n.importance_level || "S",
+      keywords: (n.keywords as string[]) || [],
+      isAIRelated: n.is_ai_related !== false,
+      publishedAt: n.published_at || new Date().toISOString(),
+      isBreaking: false,
+    }));
+
+    // 按分数排序
+    allNews.sort((a, b) => b.importanceScore - a.importanceScore);
+
+    // 生成日报文章
+    const overview = await generateDailyArticle(allNews);
+    const hotTopics = extractHotTopics(allNews);
 
     // Step 8: 创建日报记录
-    const newsIds = filtered
-      .map((n) => urlToId.get(n.sourceUrl))
-      .filter((id): id is string => !!id);
+    const newsIds = allNews
+      .map(n => n.sourceUrl)
+      .filter((url): url is string => !!url);
 
     const reportId = await createDailyReport(targetDate, overview, hotTopics, newsIds);
 
     // 更新生成日志
     await updateGenerationLog(logId, {
       status: "success",
-      discoveredCount,
-      afterDedupCount,
-      afterFilterCount,
+      discoveredCount: juyaResults.length,
+      afterDedupCount: juyaResults.length,
+      afterFilterCount: filtered.length,
     });
 
-    console.log(`[Daily] Done! Report ${reportId} with ${afterFilterCount} news items`);
+    console.log(`[Daily] Done! Report ${reportId} with ${allNews.length} news items`);
 
     return NextResponse.json({
       success: true,
       reportId,
       date: targetDate,
+      newsCount: allNews.length,
       stats: {
-        discovered: discoveredCount,
-        afterDedup: afterDedupCount,
-        afterFilter: afterFilterCount,
+        discovered: juyaResults.length,
+        afterFilter: filtered.length,
+        totalNews: allNews.length,
       },
     });
   } catch (e) {
@@ -130,10 +156,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-function getYesterday(): string {
-  const d = new Date();
-  d.setDate(d.getDate() - 1);
-  return d.toISOString().split("T")[0];
 }

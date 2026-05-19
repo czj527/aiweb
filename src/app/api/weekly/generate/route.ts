@@ -1,102 +1,91 @@
 import { NextRequest, NextResponse } from "next/server";
-import { searchDateAI } from "@/lib/services/search-service";
-import { fetchMultipleURLs } from "@/lib/services/fetch-service";
 import {
-  deduplicateResults,
-  processWithAI,
-  filterNews,
   generateWeeklyOverview,
   generateWeeklyTrends,
   extractHotTopics,
 } from "@/lib/services/processor";
 import {
-  upsertNewsItems,
   createWeeklyReport,
   createGenerationLog,
   updateGenerationLog,
   getWeeklyReportByDateRange,
+  getRecentNews,
 } from "@/lib/services/db-service";
 
 /**
  * POST /api/weekly/generate
- * 触发周报生成
+ * 基于数据库中已有的新闻生成周报
  *
  * 可选 body 参数：
  * - weekStart: 周一日期 (YYYY-MM-DD)，默认上周一
+ * - force: 强制重新生成（即使已存在）
  */
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
   const { weekStart, weekEnd, weekNumber } = getLastWeekRange(body.weekStart);
+  const force = body.force === true;
 
   const logId = await createGenerationLog("weekly", weekStart);
 
   try {
     // 检查是否已存在该周的周报
-    const existing = await getWeeklyReportByDateRange(weekStart, weekEnd);
-    if (existing) {
-      await updateGenerationLog(logId, { status: "skipped", errorMessage: "Report already exists" });
-      return NextResponse.json({
-        success: true,
-        reportId: existing.id,
-        date: weekStart,
-        message: "该周的周报已存在",
-      });
-    }
-
-    // Step 1: 搜索本周AI新闻（覆盖7天）
-    console.log(`[Weekly] Step 1: Searching AI news for ${weekStart} ~ ${weekEnd}`);
-    // 搜索周内每天的AI新闻，然后合并去重
-    const allSearchResults: Awaited<ReturnType<typeof searchDateAI>> = [];
-    const dayMs = 86400000;
-    const startMs = new Date(weekStart).getTime();
-    for (let i = 0; i < 7; i++) {
-      const dayStr = new Date(startMs + i * dayMs).toISOString().split('T')[0];
-      try {
-        const dayResults = await searchDateAI(dayStr);
-        allSearchResults.push(...dayResults);
-      } catch {
-        // 跳过搜索失败的日期
+    if (!force) {
+      const existing = await getWeeklyReportByDateRange(weekStart, weekEnd);
+      if (existing) {
+        await updateGenerationLog(logId, { status: "skipped", errorMessage: "Report already exists" });
+        return NextResponse.json({
+          success: true,
+          reportId: existing.id,
+          date: weekStart,
+          message: "该周的周报已存在",
+        });
       }
     }
-    const searchResults = allSearchResults;
-    const discoveredCount = searchResults.length;
 
-    // Step 2: 去重
-    console.log(`[Weekly] Step 2: Deduplicating`);
-    const dedupedResults = deduplicateResults(searchResults);
-    const afterDedupCount = dedupedResults.length;
+    // Step 1: 从数据库获取最近7天的新闻
+    console.log(`[Weekly] Step 1: Getting news from database for ${weekStart} ~ ${weekEnd}`);
+    const recentNews = await getRecentNews(168, 200); // 7天 = 168小时
+    console.log(`[Weekly] Found ${recentNews.length} news items in database`);
 
-    // Step 3: 获取详情
-    console.log(`[Weekly] Step 3: Fetching details`);
-    const topUrls = dedupedResults.slice(0, 15).map((r) => r.url).filter(Boolean);
-    const fetchResults = await fetchMultipleURLs(topUrls, { concurrency: 3, maxLength: 3000 });
-    const fetchedMap = new Map(fetchResults.filter((r) => r.success).map((r) => [r.url, r]));
+    if (recentNews.length === 0) {
+      await updateGenerationLog(logId, { status: "empty", errorMessage: "No news found in database" });
+      return NextResponse.json({
+        success: false,
+        error: "数据库中没有找到新闻数据，请先采集RSS",
+      }, { status: 404 });
+    }
 
-    // Step 4: AI处理
-    console.log(`[Weekly] Step 4: Processing with AI`);
-    const processed = await processWithAI(dedupedResults, fetchedMap);
+    // 转换为ProcessedNews格式
+    const allNews = recentNews.map(n => ({
+      title: n.title,
+      summary: n.summary,
+      quote: "",
+      sourceName: n.source_name || "橘鸦AI早报",
+      sourceUrl: n.source_url || "",
+      category: n.category || "industry",
+      importanceScore: n.importance_score || 15,
+      importanceLevel: n.importance_level || "S",
+      keywords: (n.keywords as string[]) || [],
+      isAIRelated: n.is_ai_related !== false,
+      publishedAt: n.published_at || new Date().toISOString(),
+      isBreaking: false,
+    }));
 
-    // Step 5: 过滤
-    const filtered = filterNews(processed);
-    const afterFilterCount = filtered.length;
-    console.log(`[Weekly] Step 5: After filter: ${afterFilterCount} items`);
+    // 按分数排序
+    allNews.sort((a, b) => b.importanceScore - a.importanceScore);
 
-    // Step 6: 入库
-    console.log(`[Weekly] Step 6: Saving to database`);
-    const urlToId = await upsertNewsItems(filtered);
-
-    // Step 7: 生成周报概览和趋势
-    console.log(`[Weekly] Step 7: Generating weekly overview and trends`);
+    // Step 2: 生成周报概览和趋势
+    console.log(`[Weekly] Step 2: Generating weekly overview and trends`);
     const [overview, trends] = await Promise.all([
-      generateWeeklyOverview(filtered),
-      generateWeeklyTrends(filtered),
+      generateWeeklyOverview(allNews),
+      generateWeeklyTrends(allNews),
     ]);
-    const hotTopics = extractHotTopics(filtered);
+    const hotTopics = extractHotTopics(allNews);
 
-    // Step 8: 创建周报记录
-    const newsIds = filtered
-      .map((n) => urlToId.get(n.sourceUrl))
-      .filter((id): id is string => !!id);
+    // Step 3: 创建周报记录
+    const newsIds = allNews
+      .map(n => n.sourceUrl)
+      .filter((url): url is string => !!url);
 
     const reportId = await createWeeklyReport(
       weekStart,
@@ -112,12 +101,12 @@ export async function POST(request: NextRequest) {
 
     await updateGenerationLog(logId, {
       status: "success",
-      discoveredCount,
-      afterDedupCount,
-      afterFilterCount,
+      discoveredCount: recentNews.length,
+      afterDedupCount: recentNews.length,
+      afterFilterCount: allNews.length,
     });
 
-    console.log(`[Weekly] Done! Report ${reportId} with ${afterFilterCount} news items`);
+    console.log(`[Weekly] Done! Report ${reportId} with ${allNews.length} news items`);
 
     return NextResponse.json({
       success: true,
@@ -125,10 +114,10 @@ export async function POST(request: NextRequest) {
       weekStart,
       weekEnd,
       weekNumber,
+      newsCount: allNews.length,
       stats: {
-        discovered: discoveredCount,
-        afterDedup: afterDedupCount,
-        afterFilter: afterFilterCount,
+        discovered: recentNews.length,
+        totalNews: allNews.length,
       },
     });
   } catch (e) {
