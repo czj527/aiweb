@@ -87,7 +87,7 @@ export async function POST(request: Request) {
 请从中提取"${config.name}"的排行榜数据，使用"${config.scoreField}"作为评分指标。
 
 规则：
-1. 提取前10名的模型
+1. 提取前10名的模型（按${config.scoreField}分数从高到低排序）
 2. 每条字段:
    - model_name: 模型全称含版本号
    - developer: 开发公司/组织（中文或英文原名）
@@ -97,8 +97,8 @@ export async function POST(request: Request) {
    - rank_change: 与上次排名变化（正数=上升，负数=下降，无法判断填0）
    - description: 简短特点描述（8字内）
 3. 严格按照页面数据提取，不要编造模型和分数
-4. 如果某个模型缺少某个指标，用"-"或"未知"填充
-5. 按${config.scoreField}分数从高到低排序
+4. 如果某个模型缺少${config.scoreField}分数，跳过该模型
+5. 只返回有${config.scoreField}分数的模型
 
 返回紧凑JSON：
 {"entries":[...]}`;
@@ -107,7 +107,7 @@ export async function POST(request: Request) {
       { role: "system", content: systemPrompt },
       {
         role: "user",
-        content: `请从以下页面内容中提取${config.name}的排行榜数据：\n\n${pageContent.slice(0, 20000)}`,
+        content: `请从以下页面内容中提取${config.name}的排行榜数据，只返回有${config.scoreField}分数的模型：\n\n${pageContent.slice(0, 25000)}`,
       },
     ];
 
