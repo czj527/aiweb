@@ -595,13 +595,14 @@ export interface NewsItemRow {
   title: string;
   summary: string | null;
   ai_detail: string | null;
-  source: string;
+  source_name: string;
   source_url: string;
   category: string;
   importance_score: number;
   importance_level: string;
   keywords: string[];
   published_at: string;
+  is_ai_related: boolean;
   related_ids: string[];
   created_at: string;
 }

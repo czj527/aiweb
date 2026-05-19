@@ -128,11 +128,11 @@ function handleStreamSync(targetDate: string, force: boolean) {
         const recentNews = await getRecentNews(24, 50);
         const allNews = recentNews.map(n => ({
           title: n.title,
-          summary: n.summary,
+          summary: n.summary || "",
           quote: "",
           sourceName: n.source_name || "橘鸦AI早报",
           sourceUrl: n.source_url || "",
-          category: n.category || "industry",
+          category: (n.category || "industry") as "model" | "agent" | "opensource" | "product" | "research" | "industry" | "policy" | "rumor",
           importanceScore: n.importance_score || 15,
           importanceLevel: n.importance_level || "S",
           keywords: (n.keywords as string[]) || [],
@@ -258,11 +258,11 @@ async function handleJsonSync(targetDate: string, force: boolean) {
     const recentNews = await getRecentNews(24, 50);
     const allNews = recentNews.map(n => ({
       title: n.title,
-      summary: n.summary,
+      summary: n.summary || "",
       quote: "",
       sourceName: n.source_name || "橘鸦AI早报",
       sourceUrl: n.source_url || "",
-      category: n.category || "industry",
+      category: (n.category || "industry") as "model" | "agent" | "opensource" | "product" | "research" | "industry" | "policy" | "rumor",
       importanceScore: n.importance_score || 15,
       importanceLevel: n.importance_level || "S",
       keywords: (n.keywords as string[]) || [],

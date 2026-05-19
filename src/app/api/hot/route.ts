@@ -10,7 +10,7 @@ function transformNewsRow(row: NewsItemRow) {
     title: row.title,
     summary: row.summary,
     aiDetail: row.ai_detail ?? null,
-    source: row.source,
+    source: row.source_name,
     sourceUrl: row.source_url,
     category: row.category,
     importanceScore: row.importance_score,
