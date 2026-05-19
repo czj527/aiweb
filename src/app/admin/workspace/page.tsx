@@ -625,7 +625,7 @@ export default function WorkspacePage() {
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: type === 'leaderboard' ? JSON.stringify({ source: 'datalearner-aa' }) : undefined,
+        body: type === 'leaderboard' ? JSON.stringify({ source: 'datalearner-comprehensive' }) : undefined,
       });
       const data = await res.json();
       setGenerateResult({
@@ -773,7 +773,7 @@ export default function WorkspacePage() {
         url = '/api/weekly/generate';
       } else {
         url = '/api/leaderboard/fetch';
-        body = { source: 'datalearner-aa' };
+        body = { source: 'datalearner-comprehensive' };
       }
 
       const res = await fetch(url, {
