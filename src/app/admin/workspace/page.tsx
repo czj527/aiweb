@@ -1254,7 +1254,7 @@ export default function WorkspacePage() {
                   <Icon className="w-3.5 h-3.5" />
                   {label}
                 </button>
-              ))
+              ))}
             </div>
           </div>
         )}
