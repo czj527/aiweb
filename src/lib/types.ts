@@ -20,11 +20,7 @@ export interface NewsItem {
   source: string;
   publishedAt: string;
   category: NewsCategory;
-  // 详情页用
-  content?: string;
   tags?: string[];
-  readingTime?: string;
-  multiSources?: { name: string; title: string; summary: string; url?: string }[];
   relatedIds?: string[];
 }
 
@@ -33,15 +29,6 @@ export interface DailyReport {
   date: string;
   displayDate: string;
   overview: string;
-  news: NewsItem[];
-}
-
-// 周报数据
-export interface WeeklyReport {
-  weekNumber: number;
-  weekRange: string;
-  overview: string;
-  trends: string[];
   news: NewsItem[];
 }
 
@@ -54,15 +41,3 @@ export interface ModelRanking {
   score: number;
   change: number;
 }
-
-// 排行榜维度（兼容旧代码）
-export type LeaderboardDimension = 'overall' | 'code' | 'reasoning' | 'chinese' | 'multimodal' | 'hard';
-
-export const dimensionLabels: Record<string, string> = {
-  overall: '综合排名',
-  code: '代码能力',
-  reasoning: '推理能力',
-  chinese: '中文能力',
-  hard: '高难度',
-  multimodal: '多模态',
-};

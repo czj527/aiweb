@@ -8,9 +8,8 @@ export function Navbar() {
   const pathname = usePathname();
 
   const links = [
-    { href: '/', label: '今日热点' },
+    { href: '/', label: '首页' },
     { href: '/daily', label: '日报' },
-    { href: '/news', label: '全部资讯' },
     { href: '/leaderboard', label: '排行榜' },
     { href: '/admin/workspace', label: '管理', className: 'text-muted-foreground/60 text-xs' },
   ];

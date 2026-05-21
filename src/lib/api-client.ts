@@ -26,6 +26,30 @@ async function fetchAPI<T>(path: string, options?: RequestInit): Promise<T> {
   return json as T;
 }
 
+// ============ 橘鸦资讯 ============
+
+export interface JuyaNewsItem {
+  title: string;
+  url: string;
+  quote: string;
+  snippet: string;
+}
+
+export interface JuyaCategoryData {
+  category: string;
+  items: JuyaNewsItem[];
+}
+
+export interface JuyaNewsResponse {
+  totalCount: number;
+  categories: JuyaCategoryData[];
+  fetchedAt: string;
+}
+
+export async function getJuyaNews(): Promise<JuyaNewsResponse> {
+  return fetchAPI<JuyaNewsResponse>('/api/juya/news');
+}
+
 // ============ 日报 ============
 
 export interface DailyReportResponse {
@@ -59,50 +83,6 @@ export async function getLatestDaily(topOnly = true): Promise<DailyReportRespons
 
 export async function getDailyByDate(date: string): Promise<DailyReportResponse> {
   return fetchAPI<DailyReportResponse>(`/api/daily?date=${date}`);
-}
-
-export async function generateDaily(): Promise<{ success: boolean; reportId: string; stats: { discovered: number; afterDedup: number; afterFilter: number } }> {
-  return fetchAPI('/api/daily/generate', { method: 'POST' });
-}
-
-// ============ 周报 ============
-
-export interface WeeklyReportResponse {
-  id: string;
-  weekNumber: number;
-  weekStart: string;
-  weekEnd: string;
-  overview: string;
-  techTrends: string;
-  industryTrends: string;
-  investmentHighlights: string;
-  hotTopics: string[];
-  newsCount: number;
-  trends: string[];
-  news: NewsItemResponse[];
-  createdAt: string;
-}
-
-export async function getLatestWeekly(): Promise<WeeklyReportResponse> {
-  return fetchAPI<WeeklyReportResponse>('/api/weekly');
-}
-
-export async function getWeeklyByDate(date: string): Promise<WeeklyReportResponse> {
-  return fetchAPI<WeeklyReportResponse>(`/api/weekly?date=${date}`);
-}
-
-export async function generateWeekly(): Promise<{ success: boolean; reportId: string }> {
-  return fetchAPI('/api/weekly/generate', { method: 'POST' });
-}
-
-// ============ 新闻详情 ============
-
-export interface NewsDetailResponse extends NewsItemResponse {
-  multiSourceViews: { source: string; title: string; summary: string; url: string }[];
-}
-
-export async function getNewsDetail(id: string): Promise<NewsDetailResponse> {
-  return fetchAPI<NewsDetailResponse>(`/api/news?id=${id}`);
 }
 
 // ============ 排行榜 ============
@@ -168,20 +148,10 @@ export async function adminDeleteNews(token: string, newsId: string): Promise<{ 
   });
 }
 
-export async function adminTriggerGenerate(token: string, type: 'daily' | 'weekly' | 'leaderboard'): Promise<{ success: boolean; data?: unknown }> {
-  const endpoint = type === 'leaderboard'
-    ? '/api/leaderboard/fetch'
-    : `/api/${type}/generate`;
-  return fetchAPI(endpoint, {
+export async function adminTriggerLeaderboard(token: string): Promise<{ success: boolean; data?: unknown }> {
+  return fetchAPI('/api/leaderboard/fetch', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
     body: JSON.stringify({ source: 'datalearner', category: 'aa-index' }),
   });
-}
-
-// ===== All News Page API =====
-
-export async function getAllNews(reportDate?: string): Promise<DailyReportResponse | null> {
-  const query = reportDate ? `?date=${reportDate}` : '';
-  return fetchAPI(`/api/daily${query}`);
 }

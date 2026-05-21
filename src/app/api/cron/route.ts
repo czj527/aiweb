@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
  * POST /api/cron
  * Railway Cron 定时任务调用端点
  *
- * body: { task: "collect" | "daily" | "weekly" | "leaderboard" | "all" }
+ * body: { task: "juya-check" | "leaderboard" | "all" }
  * 需要设置 CRON_SECRET 环境变量作为认证
  */
 
@@ -22,15 +22,10 @@ export async function POST(request: NextRequest) {
   const baseUrl = process.env.SITE_URL || `http://localhost:${process.env.PORT || 5000}`;
 
   const taskEndpoints: Record<string, string[]> = {
-    collect: ["/api/news/collect"],
-    daily: ["/api/news/collect", "/api/daily/generate"],
-    weekly: ["/api/weekly/generate"],
-    leaderboard: [
-      "/api/leaderboard/fetch",
-    ],
-    all: [
-      "/api/news/collect",
-      "/api/daily/generate",
+    "juya-check": ["/api/cron/juya-check"],
+    "leaderboard": ["/api/leaderboard/fetch"],
+    "all": [
+      "/api/cron/juya-check",
       "/api/leaderboard/fetch",
     ],
   };

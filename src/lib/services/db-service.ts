@@ -535,7 +535,7 @@ export async function replaceLeaderboard(
  * 创建生成日志
  */
 export async function createGenerationLog(
-  type: "daily" | "weekly" | "collect" | "daily-sync" | "rss-collect",
+  type: "daily" | "weekly" | "collect" | "daily-sync" | "rss-collect" | "juya-check",
   targetDate: string
 ): Promise<string> {
   const client = getClient();
@@ -563,6 +563,7 @@ export async function updateGenerationLog(
     afterDedupCount?: number;
     afterFilterCount?: number;
     errorMessage?: string;
+    message?: string;
   }
 ) {
   const client = getClient();
