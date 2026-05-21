@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { fetchJuyaFeed } from "@/lib/services/rss-fetch-service";
+import { fetchJuyaFeed, JUYA_CATEGORY_MAP } from "@/lib/services/rss-fetch-service";
 
 /**
  * GET /api/juya/news
@@ -11,12 +11,19 @@ export async function GET(request: NextRequest) {
   try {
     const results = await fetchJuyaFeed();
 
-    // 按分类分组
-    const byCategory: Record<string, typeof results> = {};
+    // 按分类分组（将橘鸦原始分类名映射为内部key）
+    const byCategory: Record<string, Array<{ title: string; url: string; quote: string; snippet: string }>> = {};
     for (const item of results) {
-      const cat = item._juyaCategory || "industry";
+      // 映射分类：橘鸦分类名 → 内部key
+      const rawCat = item._juyaCategory || "";
+      const cat = JUYA_CATEGORY_MAP[rawCat] || rawCat || "industry";
       if (!byCategory[cat]) byCategory[cat] = [];
-      byCategory[cat].push(item);
+      byCategory[cat].push({
+        title: item.title,
+        url: item.url,
+        quote: item._juyaQuote || "",
+        snippet: item.snippet,
+      });
     }
 
     // 分类顺序
@@ -27,12 +34,7 @@ export async function GET(request: NextRequest) {
       .filter((cat) => byCategory[cat]?.length > 0)
       .map((cat) => ({
         category: cat,
-        items: byCategory[cat].map((item) => ({
-          title: item.title,
-          url: item.url,
-          quote: item._juyaQuote || item.snippet,
-          snippet: item.snippet,
-        })),
+        items: byCategory[cat],
       }));
 
     return NextResponse.json({

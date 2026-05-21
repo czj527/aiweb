@@ -32,50 +32,59 @@ export async function POST(request: NextRequest) {
   const logId = await createGenerationLog("juya-check", today);
 
   try {
-    // Step 1: 获取橘鸦RSS
-    console.log(`[JuyaCheck] Step 1: Fetching 橘鸦 RSS`);
+    // Step 1: 检查是否已有当天日报（如果已有则跳过采集）
+    const existingReport = await getDailyReportByDate(today);
+    if (existingReport) {
+      await updateGenerationLog(logId, { status: "skipped", errorMessage: "Report already exists" });
+      return NextResponse.json({
+        success: true,
+        skipped: true,
+        message: `${today} 的日报已存在`,
+      });
+    }
+
+    // Step 2: 获取橘鸦RSS新闻列表
+    console.log(`[JuyaCheck] Step 2: Fetching 橘鸦 RSS`);
     const juyaResults = await fetchJuyaFeed();
     console.log(`[JuyaCheck] Collected ${juyaResults.length} articles from 橘鸦`);
 
     if (juyaResults.length === 0) {
-      await updateGenerationLog(logId, { status: "no_content", message: "No content from 橘鸦 RSS" });
+      await updateGenerationLog(logId, { status: "no_content", errorMessage: "No content from 橘鸦 RSS" });
       return NextResponse.json({
         success: true,
-        message: "No new content from 橘鸦",
+        message: "橘鸦RSS暂无更新",
         newsCount: 0,
       });
     }
 
-    // Step 2: URL去重
-    console.log(`[JuyaCheck] Step 2: Deduplicating`);
+    // Step 3: URL去重
+    console.log(`[JuyaCheck] Step 3: Deduplicating`);
     const dedupedResults = deduplicateResults(juyaResults);
 
-    // Step 3: 72小时数据库去重
+    // Step 4: 72小时数据库去重
     const freshResults = await dedupAgainstDatabase(dedupedResults, 72);
     console.log(`[JuyaCheck] After dedup: ${freshResults.length} articles`);
 
-    // Step 4: 转换格式（橘鸦内容已审核，跳过AI处理）
+    // Step 5: 转换格式（橘鸦内容已审核，跳过AI处理和filterNews）
     const processedNews = convertJuyaResults(freshResults);
 
-    // Step 5: 入库
-    console.log(`[JuyaCheck] Step 5: Saving to database`);
+    // Step 6: 入库
+    console.log(`[JuyaCheck] Step 6: Saving to database`);
     await upsertNewsItems(processedNews);
 
-    // Step 6: 检查是否已有当天日报
-    const existingReport = await getDailyReportByDate(today);
-    let reportId = existingReport?.id;
-
-    if (!existingReport) {
-      // 获取完整日报HTML
-      console.log(`[JuyaCheck] Step 6: Creating daily report`);
-      const dailyHTML = await fetchJuyaDailyReport();
-      
-      // 创建日报记录
-      reportId = await createDailyReport(today, dailyHTML, [], []);
-      console.log(`[JuyaCheck] Created daily report: ${reportId}`);
+    // Step 7: 获取完整日报HTML并创建日报记录
+    console.log(`[JuyaCheck] Step 7: Creating daily report`);
+    const juyaReport = await fetchJuyaDailyReport();
+    
+    let reportId: string;
+    if (juyaReport) {
+      // 使用橘鸦的完整HTML内容作为日报overview
+      reportId = await createDailyReport(today, juyaReport.content, [], []);
     } else {
-      console.log(`[JuyaCheck] Daily report for ${today} already exists`);
+      // 降级：用新闻条数作为概览
+      reportId = await createDailyReport(today, `今日共 ${processedNews.length} 条AI资讯`, [], []);
     }
+    console.log(`[JuyaCheck] Created daily report: ${reportId}`);
 
     // 更新生成日志
     await updateGenerationLog(logId, {

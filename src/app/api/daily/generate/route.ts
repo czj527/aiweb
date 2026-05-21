@@ -48,10 +48,15 @@ export async function POST(request: NextRequest) {
 
     // 直接获取橘鸦日报HTML内容
     console.log(`[Daily Generate] Fetching 橘鸦 daily report for ${targetDate}`);
-    const overview = await fetchJuyaDailyReport();
+    const juyaReport = await fetchJuyaDailyReport();
 
-    // 创建日报记录
-    const reportId = await createDailyReport(targetDate, overview, [], []);
+    if (!juyaReport) {
+      await updateGenerationLog(logId, { status: "empty", errorMessage: "No content from RSS" });
+      return NextResponse.json({ success: true, message: "橘鸦RSS暂无更新" });
+    }
+
+    // 创建日报记录（使用橘鸦完整HTML内容作为overview）
+    const reportId = await createDailyReport(targetDate, juyaReport.content, [], []);
 
     // 更新生成日志
     await updateGenerationLog(logId, {
@@ -64,6 +69,7 @@ export async function POST(request: NextRequest) {
       success: true,
       reportId,
       date: targetDate,
+      title: juyaReport.title,
       message: "日报生成成功",
     });
   } catch (e) {
