@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     const results = await fetchJuyaFeed();
 
     // 按橘鸦原始分类名分组
-    const byCategory: Record<string, Array<{ title: string; url: string; quote: string; snippet: string }>> = {};
+    const byCategory: Record<string, Array<{ title: string; url: string; quote: string; snippet: string; order: number }>> = {};
     for (const item of results) {
       const cat = item._juyaCategory || "要闻";
       if (!byCategory[cat]) byCategory[cat] = [];
@@ -22,11 +22,12 @@ export async function GET(request: NextRequest) {
         url: item.url,
         quote: item._juyaQuote || "",
         snippet: item.snippet,
+        order: item._juyaOrder || 0,
       });
     }
 
     // 按橘鸦分类顺序排列
-    const categories: Array<{ category: string; items: Array<{ title: string; url: string; quote: string; snippet: string }> }> = [];
+    const categories: Array<{ category: string; items: Array<{ title: string; url: string; quote: string; snippet: string; order: number }> }> = [];
     const coveredCats = new Set<string>();
 
     for (const cat of JUYA_CATEGORIES) {

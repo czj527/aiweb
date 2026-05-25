@@ -116,6 +116,7 @@ export interface ProcessedNews {
   isAIRelated: boolean;
   publishedAt: string;
   isBreaking: boolean;
+  juyaOrder: number;
 }
 
 // 橘鸦RSS解析结果类型
@@ -127,6 +128,7 @@ export interface SearchResult {
   date?: string;
   _juyaCategory?: string;
   _juyaQuote?: string;
+  _juyaOrder?: number;
 }
 
 // ============================================================
@@ -167,6 +169,7 @@ export function convertJuyaResults(results: SearchResult[]): ProcessedNews[] {
       isAIRelated: true,
       publishedAt: r.date ? new Date(r.date).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
       isBreaking: false,
+      juyaOrder: r._juyaOrder || 0,
     };
   });
 }

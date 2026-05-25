@@ -41,8 +41,9 @@ function renderContent(content: string): string {
     return content
       // h1 标题
       .replace(/<h1>(.*?)<\/h1>/g, '<h1 class="text-3xl font-bold font-display text-foreground mb-6 tracking-tight">$1</h1>')
-      // h2 标题（新闻标题）
-      .replace(/<h2>(.*?)<\/h2>/g, '<h2 class="text-xl font-bold font-display text-foreground mt-10 mb-4 tracking-tight border-b border-border/30 pb-3">$1</h2>')
+      // h2 标题（新闻标题）- 用#N编号做锚点便于跳转
+      .replace(/<h2><a href="(.*?)">(.*?)<\/a>\s*<code>#(\d+)<\/code><\/h2>/g, '<h2 id="news-$3" class="text-xl font-bold font-display text-foreground mt-10 mb-4 tracking-tight border-b border-border/30 pb-3 scroll-mt-20"><a href="$1" class="text-primary hover:underline" target="_blank" rel="noopener noreferrer">$2</a> <a href="#news-$3" class="text-muted-foreground hover:text-primary no-underline"><code class="px-1.5 py-0.5 bg-muted rounded text-sm font-mono text-primary">#$3</code></a></h2>')
+      .replace(/<h2>(.*?)<code>#(\d+)<\/code><\/h2>/g, '<h2 id="news-$2" class="text-xl font-bold font-display text-foreground mt-10 mb-4 tracking-tight border-b border-border/30 pb-3 scroll-mt-20">$1 <a href="#news-$2" class="text-muted-foreground hover:text-primary no-underline"><code class="px-1.5 py-0.5 bg-muted rounded text-sm font-mono text-primary">#$2</code></a></h2>')
       // h3 标题（分类标题）
       .replace(/<h3>(.*?)<\/h3>/g, '<h3 class="text-lg font-bold font-display text-foreground mt-8 mb-3 tracking-tight text-primary">$1</h3>')
       // blockquote（引用摘要）
@@ -160,6 +161,29 @@ function DailyPageContent() {
       loadLatest();
     }
   }, [loadLatest, loadByDate, searchParams]);
+
+  // 日报加载后，滚动到highlight指定的新闻
+  useEffect(() => {
+    if (!report || loading) return;
+    const highlight = searchParams.get('highlight');
+    if (!highlight) return;
+
+    // 等待DOM渲染后查找
+    requestAnimationFrame(() => {
+      const h2s = document.querySelectorAll('article h2');
+      for (const h2 of h2s) {
+        if (h2.textContent?.includes(highlight)) {
+          h2.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // 高亮效果
+          h2.classList.add('ring-2', 'ring-primary/40', 'rounded', 'transition-all');
+          setTimeout(() => {
+            h2.classList.remove('ring-2', 'ring-primary/40', 'rounded');
+          }, 3000);
+          break;
+        }
+      }
+    });
+  }, [report, loading, searchParams]);
 
   const handleTabChange = (m: ViewMode) => {
     setMode(m);

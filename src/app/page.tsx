@@ -79,7 +79,7 @@ export default function HomePage() {
         const dateStr = today.toISOString().split('T')[0];
 
         const categories: CategoryGroup[] = rssJson.data.categories.map(
-          (cat: { category: string; items: Array<{ title: string; url: string; snippet: string; quote?: string }> }) => ({
+          (cat: { category: string; items: Array<{ title: string; url: string; snippet: string; quote?: string; order?: number }> }) => ({
             category: cat.category,
             count: cat.items.length,
             items: cat.items.map((item, idx: number) => ({
@@ -261,14 +261,14 @@ export default function HomePage() {
                       {activeGroup.items.map((item) => (
                         <Link
                           key={item.id}
-                          href={`/daily?date=${day.date}&article=${item.id}`}
+                          href={`/daily?date=${day.date}&highlight=${encodeURIComponent(item.title)}`}
                           className="block border border-border/25 rounded-md bg-muted/50 px-5 py-4 hover:border-primary/40 hover:shadow-float transition-all duration-200"
                         >
                           <h3 className="text-base font-medium text-card-foreground">
                             {item.title}
                           </h3>
                           <p className="text-xs text-muted-foreground mt-2">
-                            {item.source} · {formatTime(item.publishedAt)}
+                            {item.source}
                           </p>
                           <p className="text-sm text-card-foreground/70 mt-2 leading-relaxed line-clamp-2">
                             {item.summary}
@@ -290,19 +290,4 @@ export default function HomePage() {
   );
 }
 
-/** 格式化时间为 HH:MM 或 MM-DD HH:MM */
-function formatTime(publishedAt: string): string {
-  try {
-    const d = new Date(publishedAt);
-    if (isNaN(d.getTime())) return publishedAt;
-    const now = new Date();
-    const h = d.getHours().toString().padStart(2, '0');
-    const m = d.getMinutes().toString().padStart(2, '0');
-    if (d.toDateString() === now.toDateString()) {
-      return `${h}:${m}`;
-    }
-    return `${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')} ${h}:${m}`;
-  } catch {
-    return publishedAt;
-  }
-}
+
