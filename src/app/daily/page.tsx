@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
 import { Navbar } from '@/components/navbar';
 import {
   Calendar,
@@ -89,7 +90,7 @@ function renderContent(content: string): string {
     .join('');
 }
 
-export default function DailyPage() {
+function DailyPageContent() {
   const [mode, setMode] = useState<ViewMode>('latest');
   const [report, setReport] = useState<DailyReport | null>(null);
   const [archiveList, setArchiveList] = useState<DailyListItem[]>([]);
@@ -318,5 +319,13 @@ export default function DailyPage() {
         )}
       </main>
     </div>
+  );
+}
+
+export default function DailyPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-background flex items-center justify-center"><p className="text-muted-foreground">加载中...</p></div>}>
+      <DailyPageContent />
+    </Suspense>
   );
 }

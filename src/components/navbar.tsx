@@ -16,7 +16,7 @@ export function Navbar() {
 
   return (
     <header className="bg-card sticky top-0 z-40 border-b border-border/30">
-      <div className="max-w-5xl mx-auto h-14 flex items-center justify-between px-6">
+      <div className="max-w-7xl mx-auto h-14 flex items-center justify-between px-6">
         <Link href="/" className="flex items-center gap-2.5">
           <Newspaper className="text-primary w-5 h-5" />
           <span className="font-bold text-lg tracking-tight font-display">AI Pulse</span>
