@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <link href="https://lf-code-agent.coze.cn/obj/x-ai-cn/fonts/google/google-all-fonts.css" rel="stylesheet"/>
+
+  <script src="https://lf-code-agent.coze.cn/obj/x-ai-cn/cdn/jquery/jquery-3.7.1.min.js"></script>
+  <script src="https://lf-code-agent.coze.cn/obj/x-ai-cn/cdn/lucide/lucide-1.11.0.min.js"></script>
+  <script src="https://lf-code-agent.coze.cn/obj/x-ai-cn/cdn/tailwindcss/tailwindcss-browser-4.2.4.min.js"></script>
+
+  <style type="text/tailwindcss">
+    @theme {
+      /* === 品牌色（杂志风：黑白克制）=== */
+      --color-primary:              #111111;
+      --color-primary-container:    #2A2A2A;
+      --color-on-primary:           #F4F1EA;
+      /* === 背景 / 表面（暖色纸张底色）=== */
+      --color-background:                 #F4F1EA;
+      --color-surface-container-lowest:   #F8F6F0;
+      --color-surface:                    #FFFFFF;
+      --color-surface-container:          #EDE9E0;
+      --color-surface-container-high:     #E4DFD4;
+      --color-surface-container-highest:  #D8D1C4;
+      /* === 文字 === */
+      --color-on-surface:           #111111;
+      --color-on-surface-variant:   #6B665E;
+      /* === 功能色 === */
+      --color-success:  #22c55e;
+      --color-error:    #ef4444;
+      --color-warning:  #f59e0b;
+      /* === 边框 === */
+      --color-outline:          #D8D1C4;
+      --color-outline-variant:  #D8D1C4;
+      /* === 圆角 === */
+      --radius-sm:   0.125rem;
+      --radius-md:   0.25rem;
+      --radius-lg:   0.375rem;
+      --radius-xl:   0.5rem;
+      --radius-2xl:  0.75rem;
+      --radius-full: 9999px;
+      /* === 阴影 === */
+      --shadow-card:   0 2px 8px rgba(0,0,0,0.08);
+      --shadow-float:  0 10px 25px rgba(0,0,0,0.12);
+      --shadow-dialog: 0 25px 50px rgba(0,0,0,0.16);
+      /* === 字体 === */
+      --font-sans: "Noto Serif SC", Georgia, "Times New Roman", system-ui, serif;
+      --font-display: "Playfair Display", "Noto Serif SC", Georgia, serif;
+    }
+  </style>
+
+  <!-- 图片兜底 -->
+  <script>
+    document.addEventListener('error', function (e) {
+      const img = e.target;
+      if (img.tagName !== 'IMG' || img.dataset.fallback) return;
+      img.dataset.fallback = '1';
+      const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const cat = img.getAttribute('data-category') || '其他';
+      const alt = img.getAttribute('alt') || '';
+      const label = esc(alt.length > 8 ? alt.slice(0, 8) + '…' : alt);
+      const icons = { '人物': '👤', '自然风景': '🏞', '动物': '🐾', '建筑城市': '🏙', '运动体育': '⚽', '交通工具': '🚗', '食物': '🍽', '服饰时尚': '👗', '商业科技': '💼', '游戏娱乐': '🎮', '艺术': '🎨', '其他': '🖼' };
+      const icon = icons[cat] || '🖼';
+      const w = img.width || 400, h = img.height || 300;
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="100%" height="100%" fill="%23f3f4f6"/><text x="50%" y="45%" text-anchor="middle" font-size="${Math.min(w, h) * 0.18}" dominant-baseline="central">${icon}</text><text x="50%" y="68%" text-anchor="middle" font-size="${Math.min(w, h) * 0.07}" fill="%239ca3af" font-family="system-ui,sans-serif" dominant-baseline="central">${label}</text></svg>`;
+      img.src = 'data:image/svg+xml,' + svg;
+    }, true);
+  </script>
+</head>
+
+<body class="bg-background text-on-surface font-sans">
+
+  <!-- @nav:start 导航组件 -->
+  <header class="bg-surface sticky top-0 z-40 border-b border-outline-variant/20">
+    <div class="max-w-7xl mx-auto h-14 flex items-center justify-between px-6">
+      <a href="home.html" class="flex items-center gap-2">
+        <i data-lucide="zap" class="text-primary w-5 h-5"></i>
+        <span class="font-display font-bold text-lg text-on-surface">AI Pulse</span>
+      </a>
+      <nav class="flex items-center gap-1">
+        <a href="home.html" class="px-3 py-1.5 text-sm font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-md transition-colors">首页</a>
+        <a href="daily.html" class="px-3 py-1.5 text-sm font-medium text-on-primary bg-primary rounded-md" aria-current="page">日报</a>
+        <a href="#" class="px-3 py-1.5 text-sm font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-md transition-colors">排行榜</a>
+        <a href="#" class="px-3 py-1.5 text-sm font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-md transition-colors">管理</a>
+      </nav>
+    </div>
+  </header>
+  <!-- @nav:end 导航组件 -->
+
+  <!-- @main-content:start -->
+  <main class="max-w-7xl mx-auto px-6 py-8">
+    <div class="max-w-3xl mx-auto">
+      <!-- 日报主卡片 -->
+      <div class="bg-surface shadow-card rounded-lg">
+
+        <!-- 日报头区 -->
+        <div class="px-8 pt-8">
+          <div class="flex items-center justify-between gap-4">
+            <h1 id="daily-date-title" class="font-display font-bold text-2xl text-on-surface">2025年6月15日 · 周一</h1>
+            <input type="date" id="date-picker" value="2025-06-15" class="border border-outline/40 rounded-md bg-surface-container px-3 py-1.5 text-sm shrink-0">
+          </div>
+          <p id="daily-summary" class="text-base text-on-surface-variant leading-relaxed mt-4">今日 AI 领域发生多起重大事件，OpenAI 发布 GPT-5，DeepSeek 开源 V3 模型，芯片巨头 NVIDIA 公布 B200 系列最新进展，Anthropic 推出 Claude 4 重大更新。</p>
+        </div>
+
+        <!-- 日报正文区 -->
+        <div id="daily-content" class="px-8 pb-8">
+
+          <!-- 章节1：大模型动态 -->
+          <div id="section-llm" class="border-t border-outline/20 pt-6 mt-8">
+            <h2 class="font-display font-semibold text-lg text-on-surface">大模型动态</h2>
+            <p class="text-sm text-on-surface-variant mt-2 mb-4">本周大模型领域迎来密集发布，头部厂商纷纷推出新一代产品，技术竞争进入白热化阶段。</p>
+
+            <div class="space-y-4">
+              <!-- 列表-article-gpt5 -->
+              <div id="article-gpt5" class="border border-outline/25 rounded-md bg-surface-container-lowest p-4">
+                <span class="inline-flex items-center bg-surface-container text-on-surface-variant rounded-full px-2.5 py-0.5 text-xs">前沿发布</span>
+                <h3 class="text-base font-medium text-on-surface mt-2">OpenAI 正式发布 GPT-5</h3>
+                <div class="text-xs text-on-surface-variant mt-1">OpenAI 官方博客 · 2025-06-15 09:30</div>
+                <p class="text-sm text-on-surface/70 mt-2 leading-relaxed">OpenAI 在今日凌晨正式发布 GPT-5，新版本在多模态理解、推理能力和代码生成方面均有显著提升。据官方介绍，GPT-5 在多项基准测试中超越了前代产品，并新增了对视频内容的深度理解能力。</p>
+              </div>
+
+              <!-- 列表-article-deepseekv3 -->
+              <div id="article-deepseekv3" class="border border-outline/25 rounded-md bg-surface-container-lowest p-4">
+                <span class="inline-flex items-center bg-surface-container text-on-surface-variant rounded-full px-2.5 py-0.5 text-xs">开源</span>
+                <h3 class="text-base font-medium text-on-surface mt-2">DeepSeek 开源 V3 模型</h3>
+                <div class="text-xs text-on-surface-variant mt-1">DeepSeek 技术团队 · 2025-06-15 11:00</div>
+                <p class="text-sm text-on-surface/70 mt-2 leading-relaxed">DeepSeek 宣布开源其最新研发的 V3 大语言模型，该模型在保持高性能的同时大幅降低了推理成本。模型权重和训练代码已托管在 GitHub 和 Hugging Face 平台，供研究者和开发者免费使用。</p>
+              </div>
+
+              <!-- 列表-article-claude4 -->
+              <div id="article-claude4" class="border border-outline/25 rounded-md bg-surface-container-lowest p-4">
+                <span class="inline-flex items-center bg-surface-container text-on-surface-variant rounded-full px-2.5 py-0.5 text-xs">产品更新</span>
+                <h3 class="text-base font-medium text-on-surface mt-2">Anthropic 推出 Claude 4 重大更新</h3>
+                <div class="text-xs text-on-surface-variant mt-1">Anthropic 新闻中心 · 2025-06-15 14:20</div>
+                <p class="text-sm text-on-surface/70 mt-2 leading-relaxed">Claude 4 带来多项功能增强，包括更长的上下文窗口（最高支持 50 万 token）、改进的数学推理能力以及全新的「深度研究」模式，可帮助用户完成复杂的多步骤分析任务。</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 章节2：AI 应用 -->
+          <div id="section-ai-apps" class="border-t border-outline/20 pt-6 mt-8">
+            <h2 class="font-display font-semibold text-lg text-on-surface">AI 应用</h2>
+            <p class="text-sm text-on-surface-variant mt-2 mb-4">AI 应用层持续升温，开发工具与搜索产品获得资本市场高度关注。</p>
+
+            <div class="space-y-4">
+              <!-- 列表-article-cursor -->
+              <div id="article-cursor" class="border border-outline/25 rounded-md bg-surface-container-lowest p-4">
+                <span class="inline-flex items-center bg-surface-container text-on-surface-variant rounded-full px-2.5 py-0.5 text-xs">融资</span>
+                <h3 class="text-base font-medium text-on-surface mt-2">Cursor 完成 3 亿美元 C 轮融资</h3>
+                <div class="text-xs text-on-surface-variant mt-1">TechCrunch · 2025-06-15 10:15</div>
+                <p class="text-sm text-on-surface/70 mt-2 leading-relaxed">AI 代码编辑器 Cursor 宣布完成 3 亿美元 C 轮融资，投后估值达到 30 亿美元。本轮融资由 a16z 领投，资金将用于扩展团队规模和提升模型推理能力。</p>
+              </div>
+
+              <!-- 列表-article-perplexity -->
+              <div id="article-perplexity" class="border border-outline/25 rounded-md bg-surface-container-lowest p-4">
+                <span class="inline-flex items-center bg-surface-container text-on-surface-variant rounded-full px-2.5 py-0.5 text-xs">产品动态</span>
+                <h3 class="text-base font-medium text-on-surface mt-2">Perplexity 推出企业级搜索解决方案</h3>
+                <div class="text-xs text-on-surface-variant mt-1">The Verge · 2025-06-15 16:45</div>
+                <p class="text-sm text-on-surface/70 mt-2 leading-relaxed">Perplexity 发布面向企业客户的搜索平台，支持私有数据源接入、团队协作和权限管理。该产品旨在与微软 Copilot 和谷歌 Enterprise Search 展开竞争。</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 章节3：行业动态 -->
+          <div id="section-industry" class="border-t border-outline/20 pt-6 mt-8">
+            <h2 class="font-display font-semibold text-lg text-on-surface">行业动态</h2>
+            <p class="text-sm text-on-surface-variant mt-2 mb-4">全球 AI 监管与产业合作持续深化，政策环境逐步明朗。</p>
+
+            <div class="space-y-4">
+              <!-- 列表-article-eu-ai-act -->
+              <div id="article-eu-ai-act" class="border border-outline/25 rounded-md bg-surface-container-lowest p-4">
+                <span class="inline-flex items-center bg-surface-container text-on-surface-variant rounded-full px-2.5 py-0.5 text-xs">政策法规</span>
+                <h3 class="text-base font-medium text-on-surface mt-2">欧盟 AI 法案正式生效执行</h3>
+                <div class="text-xs text-on-surface-variant mt-1">Reuters · 2025-06-15 08:00</div>
+                <p class="text-sm text-on-surface/70 mt-2 leading-relaxed">欧盟《人工智能法案》今日起正式全面生效，成为全球首部综合性 AI 监管法律。该法案对高风险 AI 系统实施严格合规要求，违规企业最高面临全球年营业额 7% 的罚款。</p>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- 底部导航 -->
+        <div class="px-8 pb-8 border-t border-outline/20 pt-6">
+          <a href="home.html" id="btn-back-home" class="text-sm text-on-surface-variant hover:text-primary inline-flex items-center gap-1 transition-colors">
+            <i data-lucide="arrow-left" class="w-4 h-4"></i>
+            返回首页
+          </a>
+        </div>
+      </div>
+
+      <!-- 底部留白 -->
+      <div class="mb-8"></div>
+    </div>
+  </main>
+  <!-- @main-content:end -->
+
+  <script>
+    $(function() {
+      lucide.createIcons();
+
+      // 解析 URL 参数
+      function getUrlParams() {
+        const params = {};
+        const search = window.location.search.substring(1);
+        if (search) {
+          search.split('&').forEach(function(pair) {
+            const parts = pair.split('=');
+            params[decodeURIComponent(parts[0])] = decodeURIComponent(parts[1] || '');
+          });
+        }
+        return params;
+      }
+
+      const params = getUrlParams();
+
+      // 如果有 article 参数，高亮对应卡片并滚动到视口中心
+      if (params.article) {
+        var targetCard = $('#' + params.article);
+        if (targetCard.length) {
+          targetCard.addClass('border-primary bg-primary/5 shadow-float');
+          setTimeout(function() {
+            targetCard[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }, 300);
+        }
+      }
+
+      // 日期选择器切换 - 模拟不同日期的日报数据
+      $('#date-picker').on('change', function() {
+        var selectedDate = $(this).val();
+        // 模拟切换不同日期的日报数据
+        if (selectedDate === '2025-06-14') {
+          $('#daily-date-title').text('2025年6月14日 · 周六');
+          $('#daily-summary').text('昨日 AI 领域聚焦多模态模型突破，Google 发布 Gemini 2.5 Pro，Stability AI 推出视频生成模型，开源社区迎来 Llama 4 预览版。');
+          $('#daily-content').html(
+            '<div id="section-multimodal" class="border-t border-outline/20 pt-6 mt-8">' +
+              '<h2 class="font-display font-semibold text-lg text-on-surface">多模态突破</h2>' +
+              '<p class="text-sm text-on-surface-variant mt-2 mb-4">多模态大模型迎来重要进展，视觉理解与视频生成能力大幅提升。</p>' +
+              '<div class="space-y-4">' +
+                '<div id="article-gemini25" class="border border-outline/25 rounded-md bg-surface-container-lowest p-4">' +
+                  '<span class="inline-flex items-center bg-surface-container text-on-surface-variant rounded-full px-2.5 py-0.5 text-xs">前沿发布</span>' +
+                  '<h3 class="text-base font-medium text-on-surface mt-2">Google 发布 Gemini 2.5 Pro</h3>' +
+                  '<div class="text-xs text-on-surface-variant mt-1">Google DeepMind · 2025-06-14 10:00</div>' +
+                  '<p class="text-sm text-on-surface/70 mt-2 leading-relaxed">Google 正式发布 Gemini 2.5 Pro，新版本在图像理解、视频分析和音频处理方面实现重大突破，支持长达 2 小时的视频内容分析。</p>' +
+                '</div>' +
+                '<div id="article-stability-video" class="border border-outline/25 rounded-md bg-surface-container-lowest p-4">' +
+                  '<span class="inline-flex items-center bg-surface-container text-on-surface-variant rounded-full px-2.5 py-0.5 text-xs">产品更新</span>' +
+                  '<h3 class="text-base font-medium text-on-surface mt-2">Stability AI 推出视频生成模型</h3>' +
+                  '<div class="text-xs text-on-surface-variant mt-1">Stability AI 博客 · 2025-06-14 13:30</div>' +
+                  '<p class="text-sm text-on-surface/70 mt-2 leading-relaxed">Stability AI 发布开源视频生成模型 Stable Video Diffusion 2.0，支持生成最长 10 秒的高清视频片段，在动作连贯性和画面质量上均有显著提升。</p>' +
+                '</div>' +
+              '</div>' +
+            '</div>' +
+            '<div id="section-opensource" class="border-t border-outline/20 pt-6 mt-8">' +
+              '<h2 class="font-display font-semibold text-lg text-on-surface">开源生态</h2>' +
+              '<p class="text-sm text-on-surface-variant mt-2 mb-4">开源大模型社区活跃，多个重要模型发布预览版本。</p>' +
+              '<div class="space-y-4">' +
+                '<div id="article-llama4" class="border border-outline/25 rounded-md bg-surface-container-lowest p-4">' +
+                  '<span class="inline-flex items-center bg-surface-container text-on-surface-variant rounded-full px-2.5 py-0.5 text-xs">开源</span>' +
+                  '<h3 class="text-base font-medium text-on-surface mt-2">Meta 发布 Llama 4 预览版</h3>' +
+                  '<div class="text-xs text-on-surface-variant mt-1">Meta AI 研究院 · 2025-06-14 15:00</div>' +
+                  '<p class="text-sm text-on-surface/70 mt-2 leading-relaxed">Meta 开源 Llama 4 预览版本，参数量达 400B，采用全新的 MoE 架构，在保持高性能的同时将推理成本降低 40%。</p>' +
+                '</div>' +
+                '<div id="article-mistral" class="border border-outline/25 rounded-md bg-surface-container-lowest p-4">' +
+                  '<span class="inline-flex items-center bg-surface-container text-on-surface-variant rounded-full px-2.5 py-0.5 text-xs">前沿发布</span>' +
+                  '<h3 class="text-base font-medium text-on-surface mt-2">Mistral 发布 Medium 3 模型</h3>' +
+                  '<div class="text-xs text-on-surface-variant mt-1">Mistral AI · 2025-06-14 17:20</div>' +
+                  '<p class="text-sm text-on-surface/70 mt-2 leading-relaxed">Mistral 发布 Medium 3 系列模型，主打高效与低成本，在多项商业应用场景中展现出优异的性价比表现。</p>' +
+                '</div>' +
+              '</div>' +
+            '</div>'
+          );
+          lucide.createIcons();
+        } else {
+          // 默认恢复 2025-06-15 数据
+          window.location.reload();
+        }
+      });
+    });
+  </script>
+</body>
+
+</html>
