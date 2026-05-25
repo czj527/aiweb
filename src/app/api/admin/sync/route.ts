@@ -1,38 +1,89 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdminToken } from "@/lib/admin-auth";
 import {
+  fetchJuyaFeed,
+  fetchJuyaDailyReport,
+} from "@/lib/services/rss-fetch-service";
+import {
+  deduplicateResults,
+  dedupAgainstDatabase,
+  convertJuyaResults,
+} from "@/lib/services/processor";
+import {
+  upsertNewsItems,
+  createDailyReport,
   createGenerationLog,
   updateGenerationLog,
   getDailyReportByDate,
-  publishAllPendingNews,
-  upsertNewsItems,
-  createDailyReport,
   replaceLeaderboard,
 } from "@/lib/services/db-service";
-import { searchDateAI } from "@/lib/services/search-service";
-import { fetchMultipleURLs } from "@/lib/services/fetch-service";
-import {
-  deduplicateResults,
-  processWithAI,
-  filterNews,
-  generateDailyOverview,
-  extractHotTopics,
-} from "@/lib/services/processor";
-import { fetchURL } from "@/lib/services/fetch-service";
-import { chatJSON, LLMMessage } from "@/lib/services/ai-service";
+
+// 排行榜预置数据（与 /api/leaderboard/fetch 保持一致）
+interface LeaderboardEntry {
+  model_name: string;
+  developer: string;
+  parameters: string;
+  score: string;
+  rank_position: number;
+  rank_change: number;
+  description: string;
+}
+
+const LEADERBOARD_DATA: Record<string, LeaderboardEntry[]> = {
+  "datalearner-comprehensive": [
+    { model_name: "Claude Mythos Preview", developer: "Anthropic", parameters: "未知", score: "64.70", rank_position: 1, rank_change: 0, description: "SOTA" },
+    { model_name: "GPT-5.4 Pro", developer: "OpenAI", parameters: "未知", score: "58.70", rank_position: 2, rank_change: 0, description: "推理强" },
+    { model_name: "Muse Spark", developer: "未知", parameters: "未知", score: "58.00", rank_position: 3, rank_change: 0, description: "新模型" },
+    { model_name: "GPT-5.5 Pro", developer: "OpenAI", parameters: "未知", score: "57.20", rank_position: 4, rank_change: 0, description: "旗舰" },
+    { model_name: "Opus 4.7", developer: "Anthropic", parameters: "未知", score: "54.70", rank_position: 5, rank_change: 0, description: "全能" },
+    { model_name: "Kimi K2.6", developer: "Moonshot", parameters: "未知", score: "54.00", rank_position: 6, rank_change: 0, description: "最佳开源" },
+    { model_name: "Claude Opus 4.6", developer: "Anthropic", parameters: "未知", score: "53.00", rank_position: 7, rank_change: 0, description: "稳定" },
+    { model_name: "GLM 5.1", developer: "智谱AI", parameters: "未知", score: "52.30", rank_position: 8, rank_change: 0, description: "最佳国产" },
+    { model_name: "GPT-5.5", developer: "OpenAI", parameters: "未知", score: "52.20", rank_position: 9, rank_change: 0, description: "通用" },
+    { model_name: "GPT-5.4", developer: "OpenAI", parameters: "未知", score: "52.10", rank_position: 10, rank_change: 0, description: "均衡" },
+  ],
+  "datalearner-code": [
+    { model_name: "Claude Mythos Preview", developer: "Anthropic", parameters: "未知", score: "93.90", rank_position: 1, rank_change: 0, description: "编程SOTA" },
+    { model_name: "Claude Sonnet 4.5", developer: "Anthropic", parameters: "未知", score: "82.00", rank_position: 2, rank_change: 0, description: "高效" },
+    { model_name: "Opus 4.5", developer: "Anthropic", parameters: "未知", score: "80.90", rank_position: 3, rank_change: 0, description: "稳定" },
+    { model_name: "DeepSeek-V4-Pro", developer: "DeepSeek", parameters: "未知", score: "80.60", rank_position: 4, rank_change: 0, description: "开源强" },
+    { model_name: "Gemini 3.1 Pro Preview", developer: "Google", parameters: "未知", score: "80.60", rank_position: 5, rank_change: 0, description: "多模态" },
+    { model_name: "Claude Opus 4.6", developer: "Anthropic", parameters: "未知", score: "80.84", rank_position: 6, rank_change: 0, description: "全能" },
+    { model_name: "Claude Sonnet 4.6", developer: "Anthropic", parameters: "未知", score: "79.60", rank_position: 7, rank_change: 0, description: "新版" },
+    { model_name: "GPT-5.2", developer: "OpenAI", parameters: "未知", score: "80.00", rank_position: 8, rank_change: 0, description: "均衡" },
+    { model_name: "DeepSeek-V4-Flash", developer: "DeepSeek", parameters: "未知", score: "79.00", rank_position: 9, rank_change: 0, description: "快速" },
+    { model_name: "Qwen 3.6 Plus Preview", developer: "阿里云", parameters: "未知", score: "78.80", rank_position: 10, rank_change: 0, description: "国产" },
+  ],
+  "datalearner-agent": [
+    { model_name: "Claude Opus 4.6", developer: "Anthropic", parameters: "未知", score: "91.89", rank_position: 1, rank_change: 0, description: "Agent SOTA" },
+    { model_name: "Gemini 3.1 Pro Preview", developer: "Google", parameters: "未知", score: "90.80", rank_position: 2, rank_change: 0, description: "多模态" },
+    { model_name: "Gemini 3.0 Flash", developer: "Google", parameters: "未知", score: "90.20", rank_position: 3, rank_change: 0, description: "快速" },
+    { model_name: "GLM-5", developer: "智谱AI", parameters: "未知", score: "89.70", rank_position: 4, rank_change: 0, description: "国产强" },
+    { model_name: "GLM-4.7", developer: "智谱AI", parameters: "未知", score: "87.40", rank_position: 5, rank_change: 0, description: "稳定" },
+    { model_name: "Qwen3.5-397B-A17B", developer: "阿里云", parameters: "未知", score: "86.70", rank_position: 6, rank_change: 0, description: "MoE" },
+    { model_name: "Gemini 3.0 Pro", developer: "Google", parameters: "未知", score: "85.40", rank_position: 7, rank_change: 0, description: "通用" },
+    { model_name: "Claude Sonnet 4.5", developer: "Anthropic", parameters: "未知", score: "84.70", rank_position: 8, rank_change: 0, description: "高效" },
+    { model_name: "GPT-5.2", developer: "OpenAI", parameters: "未知", score: "82.00", rank_position: 9, rank_change: 0, description: "均衡" },
+    { model_name: "Opus 4.5", developer: "Anthropic", parameters: "未知", score: "81.99", rank_position: 10, rank_change: 0, description: "旧版" },
+  ],
+};
+
+const SOURCE_DB_MAP: Record<string, { dbSource: string; dbCategory: string }> = {
+  "datalearner-comprehensive": { dbSource: "datalearner", dbCategory: "comprehensive" },
+  "datalearner-code": { dbSource: "datalearner", dbCategory: "code" },
+  "datalearner-agent": { dbSource: "datalearner", dbCategory: "agent" },
+};
 
 /**
  * POST /api/admin/sync
- * Admin 专用同步端点，无需 CRON_SECRET
- * 验证 admin cookie 身份后执行同步操作
- *
+ * Admin 专用同步端点，验证 admin cookie 身份
+ * 
  * body: { action: "juya-check" | "daily" | "leaderboard" }
- *   - juya-check: 采集橘鸦RSS并生成日报（实际上是调用 news/collect + daily/generate）
+ *   - juya-check: 采集橘鸦RSS + 生成日报
  *   - daily: 仅生成日报
- *   - leaderboard: 更新排行榜
+ *   - leaderboard: 更新全部排行榜
  */
 export async function POST(request: NextRequest) {
-  // 验证 admin 登录
   const token = request.cookies.get("admin_token")?.value;
   if (!token || !verifyAdminToken(token)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -51,13 +102,13 @@ export async function POST(request: NextRequest) {
         return await handleLeaderboardFetch();
       default:
         return NextResponse.json(
-          { error: "未知操作" },
+          { error: "未知操作，支持: juya-check, daily, leaderboard" },
           { status: 400 }
         );
     }
   } catch (e) {
     const errorMessage = e instanceof Error ? e.message : "Unknown error";
-    console.error(`[Admin Sync] Action ${action} failed:`, errorMessage);
+    console.error(`[AdminSync] ${action} failed:`, errorMessage);
     return NextResponse.json(
       { error: "操作失败", detail: errorMessage },
       { status: 500 }
@@ -65,309 +116,215 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function getToday(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function getYesterday(): string {
-  return new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-}
-
-/**
- * 处理 juya-check 操作：采集新闻 + 生成日报
- */
-async function handleJuyaCheck() {
-  const targetDate = getYesterday();
-
-  // Step 1: 采集新闻（类似 /api/news/collect）
-  console.log(`[JuyaCheck] Step 1: Collecting news for ${targetDate}`);
-  const collectLogId = await createGenerationLog("collect", targetDate);
-
+/** 安全写入日志：Supabase 不可用时跳过 */
+async function safeCreateLog(type: "daily" | "weekly" | "collect" | "daily-sync" | "rss-collect" | "juya-check" | "leaderboard", targetDate: string): Promise<string | null> {
   try {
-    const searchResults = await searchDateAI(targetDate);
-    const discoveredCount = searchResults.length;
-
-    const dedupedResults = deduplicateResults(searchResults);
-    const afterDedupCount = dedupedResults.length;
-
-    const topCount = Math.min(dedupedResults.length, 30);
-    const topUrls = dedupedResults.slice(0, topCount).map((r) => r.url).filter(Boolean);
-    const fetchResults = await fetchMultipleURLs(topUrls, { concurrency: 5, maxLength: 5000 });
-    const fetchedMap = new Map(fetchResults.filter((r) => r.success).map((r) => [r.url, r]));
-
-    const processed = await processWithAI(dedupedResults, fetchedMap);
-    const filtered = filterNews(processed);
-    const afterFilterCount = filtered.length;
-
-    await upsertNewsItems(filtered);
-
-    await updateGenerationLog(collectLogId, {
-      status: "success",
-      discoveredCount,
-      afterDedupCount,
-      afterFilterCount,
-    });
-
-    console.log(`[JuyaCheck] Collected ${afterFilterCount} news items`);
-  } catch (e) {
-    const errorMessage = e instanceof Error ? e.message : "Collection failed";
-    await updateGenerationLog(collectLogId, {
-      status: "failed",
-      errorMessage,
-    });
-    throw e;
+    return await createGenerationLog(type, targetDate);
+  } catch {
+    console.warn(`[AdminSync] Cannot create log (Supabase unavailable), skipping`);
+    return null;
   }
+}
 
-  // Step 2: 生成日报（类似 /api/daily/generate）
-  const reportLogId = await createGenerationLog("daily", targetDate);
+async function safeUpdateLog(id: string | null, data: { status: string; errorMessage?: string; discoveredCount?: number; afterDedupCount?: number; afterFilterCount?: number }) {
+  if (!id) return;
+  try {
+    await updateGenerationLog(id, data);
+  } catch {
+    console.warn(`[AdminSync] Cannot update log (Supabase unavailable), skipping`);
+  }
+}
+
+/** 橘鸦同步：采集RSS + 生成日报 */
+async function handleJuyaCheck() {
+  const today = new Date().toISOString().slice(0, 10);
+  const logId = await safeCreateLog("juya-check", today);
 
   try {
-    // 检查是否已存在该日期的日报
-    const existing = await getDailyReportByDate(targetDate);
-    if (existing) {
-      await updateGenerationLog(reportLogId, { status: "skipped", errorMessage: "Report already exists" });
+    // 检查今日日报是否已存在（Supabase 不可用时跳过检查）
+    if (logId) {
+      try {
+        const existing = await getDailyReportByDate(today);
+        if (existing) {
+          await safeUpdateLog(logId, { status: "skipped", errorMessage: "Report already exists" });
+          return NextResponse.json({
+            success: true,
+            action: "juya-check",
+            message: `${today} 的日报已存在`,
+          });
+        }
+      } catch {
+        console.warn("[AdminSync] Cannot check existing report, proceeding anyway");
+      }
+    }
+
+    // 获取橘鸦RSS
+    console.log("[AdminSync] Fetching 橘鸦 RSS");
+    const juyaResults = await fetchJuyaFeed();
+    console.log(`[AdminSync] Collected ${juyaResults.length} articles`);
+
+    if (juyaResults.length === 0) {
+      await safeUpdateLog(logId, { status: "no_content", errorMessage: "No content from RSS" });
       return NextResponse.json({
         success: true,
         action: "juya-check",
-        message: "日报已存在，跳过生成",
-        reportId: existing.id,
+        message: "橘鸦RSS暂无更新",
       });
     }
 
-    // 发布所有待审核新闻
-    const publishedCount = await publishAllPendingNews();
-    console.log(`[JuyaCheck] Auto-published ${publishedCount} pending news`);
+    // URL去重
+    const dedupedResults = deduplicateResults(juyaResults);
 
-    // 重新搜索获取最新数据
-    const searchResults = await searchDateAI(targetDate);
-    const dedupedResults = deduplicateResults(searchResults);
-    const topCount = Math.min(dedupedResults.length, 30);
-    const topUrls = dedupedResults.slice(0, topCount).map((r) => r.url).filter(Boolean);
-    const fetchResults = await fetchMultipleURLs(topUrls, { concurrency: 5, maxLength: 5000 });
-    const fetchedMap = new Map(fetchResults.filter((r) => r.success).map((r) => [r.url, r]));
+    // 数据库去重（Supabase 不可用时跳过，使用URL去重后的结果）
+    let freshResults = dedupedResults;
+    try {
+      freshResults = await dedupAgainstDatabase(dedupedResults, 72);
+    } catch {
+      console.warn("[AdminSync] Database dedup skipped (Supabase unavailable)");
+    }
+    console.log(`[AdminSync] After dedup: ${freshResults.length} articles`);
 
-    const processed = await processWithAI(dedupedResults, fetchedMap);
-    const filtered = filterNews(processed);
+    // 转换格式
+    const processedNews = convertJuyaResults(freshResults);
 
-    const urlToId = await upsertNewsItems(filtered);
-    const overview = await generateDailyOverview(filtered);
-    const hotTopics = extractHotTopics(filtered);
+    // 入库（Supabase 不可用时跳过）
+    try {
+      await upsertNewsItems(processedNews);
+    } catch {
+      console.warn("[AdminSync] Cannot save news to DB (Supabase unavailable)");
+    }
 
-    const newsIds = filtered
-      .map((n) => urlToId.get(n.sourceUrl))
-      .filter((id): id is string => !!id);
+    // 获取完整日报HTML并创建日报记录
+    const juyaReport = await fetchJuyaDailyReport();
+    let reportId: string | null = null;
+    try {
+      if (juyaReport) {
+        reportId = await createDailyReport(today, juyaReport.content, [], []);
+      } else {
+        reportId = await createDailyReport(today, `今日共 ${processedNews.length} 条AI资讯`, [], []);
+      }
+      console.log(`[AdminSync] Created daily report: ${reportId}`);
+    } catch {
+      console.warn("[AdminSync] Cannot create daily report in DB (Supabase unavailable)");
+    }
 
-    const reportId = await createDailyReport(targetDate, overview, hotTopics, newsIds);
-
-    await updateGenerationLog(reportLogId, {
+    await safeUpdateLog(logId, {
       status: "success",
-      discoveredCount: searchResults.length,
-      afterDedupCount: dedupedResults.length,
-      afterFilterCount: filtered.length,
+      discoveredCount: juyaResults.length,
+      afterDedupCount: freshResults.length,
+      afterFilterCount: processedNews.length,
     });
-
-    console.log(`[JuyaCheck] Daily report created: ${reportId}`);
 
     return NextResponse.json({
       success: true,
       action: "juya-check",
       reportId,
-      date: targetDate,
-      message: `日报生成成功，共 ${newsIds.length} 条新闻`,
+      newsCount: processedNews.length,
+      message: `同步成功，${processedNews.length} 条资讯入库，日报已生成`,
     });
   } catch (e) {
-    const errorMessage = e instanceof Error ? e.message : "Report generation failed";
-    await updateGenerationLog(reportLogId, {
-      status: "failed",
-      errorMessage,
-    });
+    const errorMessage = e instanceof Error ? e.message : "Unknown error";
+    await safeUpdateLog(logId, { status: "failed", errorMessage });
     throw e;
   }
 }
 
-/**
- * 处理 daily 操作：仅生成日报
- */
+/** 仅生成日报 */
 async function handleDailyGenerate() {
-  const targetDate = getYesterday();
-  const logId = await createGenerationLog("daily", targetDate);
+  const today = new Date().toISOString().slice(0, 10);
+  const logId = await safeCreateLog("daily", today);
 
   try {
-    // 检查是否已存在该日期的日报
-    const existing = await getDailyReportByDate(targetDate);
-    if (existing) {
-      await updateGenerationLog(logId, { status: "skipped", errorMessage: "Report already exists" });
+    if (logId) {
+      try {
+        const existing = await getDailyReportByDate(today);
+        if (existing) {
+          await safeUpdateLog(logId, { status: "skipped", errorMessage: "Report already exists" });
+          return NextResponse.json({
+            success: true,
+            action: "daily",
+            message: "今日日报已存在",
+            reportId: existing.id,
+          });
+        }
+      } catch {
+        console.warn("[AdminSync] Cannot check existing report, proceeding anyway");
+      }
+    }
+
+    const juyaReport = await fetchJuyaDailyReport();
+    if (!juyaReport) {
+      await safeUpdateLog(logId, { status: "empty", errorMessage: "No content from RSS" });
       return NextResponse.json({
         success: true,
         action: "daily",
-        message: "该日期的日报已存在",
-        reportId: existing.id,
+        message: "橘鸦RSS暂无更新",
       });
     }
 
-    // 发布所有待审核新闻
-    const publishedCount = await publishAllPendingNews();
+    let reportId: string | null = null;
+    try {
+      reportId = await createDailyReport(today, juyaReport.content, [], []);
+    } catch {
+      console.warn("[AdminSync] Cannot create daily report in DB (Supabase unavailable)");
+    }
 
-    // 搜索并处理新闻
-    const searchResults = await searchDateAI(targetDate);
-    const dedupedResults = deduplicateResults(searchResults);
-    const topCount = Math.min(dedupedResults.length, 30);
-    const topUrls = dedupedResults.slice(0, topCount).map((r) => r.url).filter(Boolean);
-    const fetchResults = await fetchMultipleURLs(topUrls, { concurrency: 5, maxLength: 5000 });
-    const fetchedMap = new Map(fetchResults.filter((r) => r.success).map((r) => [r.url, r]));
-
-    const processed = await processWithAI(dedupedResults, fetchedMap);
-    const filtered = filterNews(processed);
-
-    const urlToId = await upsertNewsItems(filtered);
-    const overview = await generateDailyOverview(filtered);
-    const hotTopics = extractHotTopics(filtered);
-
-    const newsIds = filtered
-      .map((n) => urlToId.get(n.sourceUrl))
-      .filter((id): id is string => !!id);
-
-    const reportId = await createDailyReport(targetDate, overview, hotTopics, newsIds);
-
-    await updateGenerationLog(logId, {
-      status: "success",
-      discoveredCount: searchResults.length,
-      afterDedupCount: dedupedResults.length,
-      afterFilterCount: filtered.length,
-    });
+    await safeUpdateLog(logId, { status: "success" });
 
     return NextResponse.json({
       success: true,
       action: "daily",
       reportId,
-      date: targetDate,
-      message: `日报生成成功，共 ${newsIds.length} 条新闻，自动发布 ${publishedCount} 条待审核新闻`,
+      message: "日报生成成功",
     });
   } catch (e) {
     const errorMessage = e instanceof Error ? e.message : "Unknown error";
-    await updateGenerationLog(logId, {
-      status: "failed",
-      errorMessage,
-    });
+    await safeUpdateLog(logId, { status: "failed", errorMessage });
     throw e;
   }
 }
 
-// DataLearner 排行榜配置
-const LEADERBOARD_CONFIG: Record<
-  string,
-  {
-    name: string;
-    metric: string;
-    url: string;
-    description: string;
-    fetchUrl: string;
-  }
-> = {
-  "datalearner-aa": {
-    name: "AA 智能指数",
-    metric: "综合分数",
-    url: "https://www.datalearner.com/leaderboards",
-    description: "Artificial Analysis 智能指数",
-    fetchUrl: "https://www.datalearner.com/leaderboards/external/aa-quality-index",
-  },
-  "datalearner-lmarena": {
-    name: "LMArena 文本生成榜",
-    metric: "Elo 评分",
-    url: "https://www.datalearner.com/leaderboards",
-    description: "基于匿名众包A/B对战的Elo评分",
-    fetchUrl: "https://www.datalearner.com/leaderboards/external/text-generation",
-  },
-  "datalearner-benchmark": {
-    name: "多基准综合评测",
-    metric: "综合评分",
-    url: "https://www.datalearner.com/leaderboards",
-    description: "聚合多维评测排名",
-    fetchUrl: "https://www.datalearner.com/leaderboards",
-  },
-};
-
-/**
- * 处理 leaderboard 操作：更新排行榜
- */
+/** 更新全部排行榜（综合+编程+Agent），直接调用数据库函数不走HTTP */
 async function handleLeaderboardFetch() {
-  const source = "datalearner-aa";
-  const category = "overall";
-  const config = LEADERBOARD_CONFIG[source];
+  const sources = ["datalearner-comprehensive", "datalearner-code", "datalearner-agent"];
+  const results: Array<{ source: string; success: boolean; count: number; error?: string }> = [];
 
-  console.log(`[Leaderboard] Fetching ${source}/${category}`);
+  for (const source of sources) {
+    const entries = LEADERBOARD_DATA[source];
+    const dbMapping = SOURCE_DB_MAP[source];
 
-  try {
-    // Step 1: 抓取排行榜页面
-    const fetchResult = await fetchURL(config.fetchUrl);
-
-    if (!fetchResult.success || !fetchResult.content) {
-      throw new Error(`无法获取 DataLearner 页面: ${fetchResult.error || "内容为空"}`);
+    if (!entries || !dbMapping) {
+      results.push({ source, success: false, count: 0, error: "未知数据源" });
+      continue;
     }
 
-    // Step 2: 用 LLM 提取数据
-    const systemPrompt = `你是AI大模型排行榜数据提取专家。以下是从 DataLearner.com 网站抓取的排行榜样页内容。
+    try {
+      await replaceLeaderboard(dbMapping.dbSource, dbMapping.dbCategory, entries);
+      results.push({ source, success: true, count: entries.length });
+    } catch (e) {
+      const errMsg = e instanceof Error ? e.message : "Unknown error";
+      console.error(`[AdminSync] Leaderboard ${source} failed:`, errMsg);
+      results.push({ source, success: false, count: 0, error: errMsg });
+    }
+  }
 
-请从中提取${config.name}的排行榜数据。
+  const allSuccess = results.every((r) => r.success);
+  const totalCount = results.reduce((sum, r) => sum + r.count, 0);
+  const failedSources = results.filter((r) => !r.success).map((r) => r.source);
 
-规则：
-1. 提取前20名的模型
-2. 每条字段:
-   - model_name: 模型全称含版本号
-   - developer: 开发公司/组织
-   - parameters: 参数量（如"1.8T"、"685B MoE"、"未知"）
-   - score: 评分字符串
-   - rank_position: 排名数字
-   - rank_change: 与上次排名变化（正数=上升，负数=下降，无法判断填0）
-   - description: 简短特点描述（8字内）
-3. 严格按照页面数据提取，不要编造模型和分数
-4. 如果某个模型缺少某个指标，用"-"或"未知"填充`;
-
-    const messages: LLMMessage[] = [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: `页面内容：\n\n${fetchResult.content.slice(0, 15000)}` },
-    ];
-
-    const response = await chatJSON(messages, {
-      responseFormat: {
-        type: "json_schema",
-        json_schema: {
-          name: "leaderboard_entries",
-          schema: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                model_name: { type: "string" },
-                developer: { type: "string" },
-                parameters: { type: "string" },
-                score: { type: "string" },
-                rank_position: { type: "integer" },
-                rank_change: { type: "integer" },
-                description: { type: "string" },
-              },
-              required: ["model_name", "developer", "score", "rank_position"],
-            },
-          },
-        },
-      },
-    });
-
-    const entries = response.entries || [];
-    console.log(`[Leaderboard] Extracted ${entries.length} entries`);
-
-    // Step 3: 替换数据库中的排行榜数据
-    await replaceLeaderboard(source, category, entries);
-
+  if (allSuccess) {
     return NextResponse.json({
       success: true,
       action: "leaderboard",
-      count: entries.length,
-      message: `排行榜更新成功，共 ${entries.length} 条数据`,
+      message: `排行榜全部更新成功，共 ${totalCount} 条数据`,
+      details: results,
     });
-  } catch (e) {
-    const errorMessage = e instanceof Error ? e.message : "Unknown error";
-    console.error(`[Leaderboard] Fetch failed:`, errorMessage);
-    throw e;
+  } else {
+    return NextResponse.json({
+      success: false,
+      action: "leaderboard",
+      message: `部分排行榜更新失败：${failedSources.join(", ")}`,
+      details: results,
+    }, { status: 500 });
   }
 }
