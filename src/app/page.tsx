@@ -1,90 +1,66 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Navbar } from '@/components/navbar';
-import {
-  Clock, Flame, ArrowRight, Hash, ChevronRight,
-  Brain, GitBranch, Rocket, Landmark, GraduationCap, Bot, Building, Eye,
-  Megaphone, Cpu, Wrench, Briefcase, FlaskConical, TrendingUp, Scale, Telescope,
-} from 'lucide-react';
-
-// 橘鸦分类的图标映射
-const categoryIcons: Record<string, React.ElementType> = {
-  '要闻': Megaphone,
-  '模型发布': Cpu,
-  '开发生态': Wrench,
-  '产品应用': Rocket,
-  '技术与洞察': FlaskConical,
-  '行业动态': TrendingUp,
-  '政策与治理': Scale,
-  '前瞻与传闻': Telescope,
-};
-
-// 橘鸦分类的显示顺序
-const categoryOrder = [
-  '要闻', '模型发布', '开发生态', '产品应用',
-  '技术与洞察', '行业动态', '政策与治理', '前瞻与传闻',
-];
-
-// 橘鸦分类的颜色
-const categoryColors: Record<string, string> = {
-  '要闻': 'text-red-500 bg-red-500/8',
-  '模型发布': 'text-blue-500 bg-blue-500/8',
-  '开发生态': 'text-emerald-500 bg-emerald-500/8',
-  '产品应用': 'text-green-500 bg-green-500/8',
-  '技术与洞察': 'text-cyan-500 bg-cyan-500/8',
-  '行业动态': 'text-orange-500 bg-orange-500/8',
-  '政策与治理': 'text-amber-500 bg-amber-500/8',
-  '前瞻与传闻': 'text-purple-500 bg-purple-500/8',
-};
-
-const categoryBorderColors: Record<string, string> = {
-  '要闻': 'border-red-500/20',
-  '模型发布': 'border-blue-500/20',
-  '开发生态': 'border-emerald-500/20',
-  '产品应用': 'border-green-500/20',
-  '技术与洞察': 'border-cyan-500/20',
-  '行业动态': 'border-orange-500/20',
-  '政策与治理': 'border-amber-500/20',
-  '前瞻与传闻': 'border-purple-500/20',
-};
+import { ArrowRight } from 'lucide-react';
 
 interface NewsItem {
+  id: string;
   title: string;
-  url: string;
-  quote: string;
-  snippet: string;
+  source: string;
+  sourceUrl: string;
+  summary: string;
+  publishedAt: string;
 }
 
-interface CategoryData {
+interface CategoryGroup {
   category: string;
+  count: number;
   items: NewsItem[];
 }
 
-interface JuyaNewsResponse {
+interface DayData {
+  date: string;
+  dateLabel: string;
+  categories: CategoryGroup[];
+  totalCount: number;
+}
+
+interface RecentNewsResponse {
   success: boolean;
   data: {
-    totalCount: number;
-    categories: CategoryData[];
+    days: DayData[];
     fetchedAt: string;
   };
 }
 
 export default function HomePage() {
-  const [data, setData] = useState<JuyaNewsResponse['data'] | null>(null);
+  const [days, setDays] = useState<DayData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // 每个卡片的当前激活分类：dayIndex -> category
+  const [activeCategoryByDay, setActiveCategoryByDay] = useState<Map<number, string>>(new Map());
+  // 每个卡片的切换动画状态
+  const [switchingDay, setSwitchingDay] = useState<number | null>(null);
 
   useEffect(() => {
     async function loadNews() {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch('/api/juya/news');
-        const json: JuyaNewsResponse = await res.json();
+        const res = await fetch('/api/news/recent?days=7');
+        const json: RecentNewsResponse = await res.json();
         if (json.success) {
-          setData(json.data);
+          setDays(json.data.days);
+          // 默认每个卡片选中第一个分类（资讯最多的）
+          const initialActive = new Map<number, string>();
+          json.data.days.forEach((day, idx) => {
+            if (day.categories.length > 0) {
+              initialActive.set(idx, day.categories[0].category);
+            }
+          });
+          setActiveCategoryByDay(initialActive);
         } else {
           setError('获取资讯失败');
         }
@@ -97,20 +73,36 @@ export default function HomePage() {
     loadNews();
   }, []);
 
+  const handleTabSwitch = useCallback((dayIndex: number, category: string) => {
+    setSwitchingDay(dayIndex);
+    setTimeout(() => {
+      setActiveCategoryByDay(prev => {
+        const next = new Map(prev);
+        next.set(dayIndex, category);
+        return next;
+      });
+      setSwitchingDay(null);
+    }, 150);
+  }, []);
+
   // Loading skeleton
   if (loading) {
     return (
       <div className="min-h-screen bg-background font-sans">
         <Navbar />
-        <main className="max-w-7xl mx-auto px-6 py-8">
+        <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
           <div className="animate-pulse space-y-8">
-            <div className="h-8 bg-muted rounded w-48" />
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="space-y-4">
-                <div className="h-6 bg-muted rounded w-32" />
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {[1, 2, 3].map((j) => (
-                    <div key={j} className="h-32 bg-muted rounded-lg" />
+            {[1, 2, 3].map(i => (
+              <div key={i} className="bg-card rounded-lg shadow-card p-6 space-y-4">
+                <div className="h-6 bg-muted rounded w-40" />
+                <div className="flex gap-2">
+                  {[1, 2, 3, 4].map(j => (
+                    <div key={j} className="h-9 bg-muted rounded-md flex-1" />
+                  ))}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {[1, 2, 3, 4].map(j => (
+                    <div key={j} className="h-28 bg-muted rounded-md" />
                   ))}
                 </div>
               </div>
@@ -121,33 +113,20 @@ export default function HomePage() {
     );
   }
 
-  const categories = data?.categories || [];
-  const totalCount = data?.totalCount || 0;
-  const activeCategories = categories.filter(cat => cat.items.length > 0);
-
-  // Get all quotes for keywords extraction
-  const allQuotes = categories.flatMap(cat => cat.items.map(item => item.snippet));
-  const hotKeywords = Array.from(
-    new Set(
-      allQuotes
-        .flatMap(text => text.match(/[A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+)*/g) || [])
-        .filter(kw => kw.length > 3 && !/^(The|This|That|And|But|For|With)$/i.test(kw))
-    )
-  ).slice(0, 8);
+  const totalNews = days.reduce((sum, d) => sum + d.totalCount, 0);
 
   return (
     <div className="min-h-screen bg-background font-sans">
       <Navbar />
-      <main className="max-w-7xl mx-auto px-6 py-8">
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
         {/* Header */}
         <div className="flex items-end justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold font-display tracking-tight flex items-center gap-2">
-              <Flame className="w-7 h-7 text-primary" />
+            <h1 className="text-3xl font-bold font-display tracking-tight text-foreground">
               橘鸦AI早报
             </h1>
             <p className="text-sm text-muted-foreground mt-2">
-              共 {totalCount} 条资讯 · {activeCategories.length} 个分类
+              共 {totalNews} 条资讯 · {days.length} 天
             </p>
           </div>
           <Link
@@ -169,154 +148,112 @@ export default function HomePage() {
               重试
             </button>
           </div>
-        ) : activeCategories.length === 0 ? (
+        ) : days.length === 0 ? (
           <div className="text-center py-16">
             <p className="text-muted-foreground text-sm">暂无资讯</p>
           </div>
         ) : (
-          <div className="flex gap-6">
-            {/* Main content */}
-            <div className="flex-1 min-w-0 space-y-10">
-              {/* ===== Category Sections ===== */}
-              {activeCategories.map((catData) => {
-                const cat = catData.category;
-                const items = catData.items;
-                const IconComponent = categoryIcons[cat];
-                const colorCls = categoryColors[cat] || 'text-primary bg-primary/8';
-                const borderColor = categoryBorderColors[cat] || 'border-primary/20';
+          <div className="space-y-8">
+            {days.map((day, dayIndex) => {
+              const activeCategory = activeCategoryByDay.get(dayIndex) || day.categories[0]?.category;
+              const activeCategoryData = day.categories.find(c => c.category === activeCategory);
+              const isSwitching = switchingDay === dayIndex;
 
-                return (
-                  <section key={cat}>
-                    {/* Category header */}
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-2.5">
-                        {IconComponent && (
-                          <div className={`w-7 h-7 rounded-md flex items-center justify-center ${colorCls}`}>
-                            <IconComponent className="w-4 h-4" />
-                          </div>
-                        )}
-                        <h2 className="text-lg font-bold font-display text-foreground">
-                          {cat}
-                        </h2>
-                        <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-                          {items.length}
-                        </span>
+              // 计算分类标签的 flex 比例
+              const totalItems = day.categories.reduce((s, c) => s + c.count, 0);
+
+              return (
+                <section
+                  key={day.date}
+                  className="bg-card rounded-lg shadow-card overflow-hidden"
+                >
+                  {/* 日期标题 */}
+                  <div className="px-6 pt-5 pb-3 flex items-center justify-between">
+                    <h2 className="font-display font-bold text-lg text-card-foreground">
+                      {day.dateLabel}
+                    </h2>
+                    <span className="text-xs text-muted-foreground">
+                      {day.totalCount} 条
+                    </span>
+                  </div>
+
+                  {/* 分类标签栏 */}
+                  {day.categories.length > 0 && (
+                    <div className="px-6 pb-3">
+                      <div className="flex gap-2">
+                        {day.categories.map(cat => {
+                          const isActive = cat.category === activeCategory;
+                          const flexRatio = totalItems > 0
+                            ? Math.max(1, Math.round((cat.count / totalItems) * 24))
+                            : 1;
+                          return (
+                            <button
+                              key={cat.category}
+                              onClick={() => handleTabSwitch(dayIndex, cat.category)}
+                              style={{ flex: flexRatio }}
+                              className={`rounded-md px-3 py-2 text-sm text-center transition-all duration-150 cursor-pointer ${
+                                isActive
+                                  ? 'bg-primary text-primary-foreground font-medium'
+                                  : 'bg-muted text-muted-foreground hover:text-foreground'
+                              }`}
+                            >
+                              {cat.category}
+                              <span className={`ml-1 text-xs ${isActive ? 'text-primary-foreground/70' : 'text-muted-foreground/60'}`}>
+                                {cat.count}
+                              </span>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
+                  )}
 
-                    {/* Category cards grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {items.map((item, idx) => (
-                        <a
-                          key={`${item.url}-${idx}`}
-                          href={item.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={`group block bg-card rounded-lg border ${borderColor} hover:border-primary/40 hover:shadow-md transition-all overflow-hidden`}
-                        >
-                          <div className={`h-1 ${colorCls.replace('text-', 'bg-').replace('/8', '/30')}`} />
-                          <div className="p-4">
-                            <h3 className="text-sm font-semibold font-display text-foreground group-hover:text-primary transition-colors leading-snug mb-2 line-clamp-2">
+                  {/* 资讯网格 */}
+                  <div className={`px-6 pb-5 transition-opacity duration-150 ${isSwitching ? 'opacity-0' : 'opacity-100'}`}>
+                    {activeCategoryData && activeCategoryData.items.length > 0 ? (
+                      <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
+                        {activeCategoryData.items.map((item, itemIdx) => (
+                          <Link
+                            key={`${day.date}-${item.id}-${itemIdx}`}
+                            href={`/daily?date=${day.date}`}
+                            className="block border border-border/25 rounded-md bg-surface-container-lowest px-5 py-4 hover:border-primary/40 hover:shadow-float transition-all duration-200"
+                          >
+                            <h3 className="text-base font-medium text-card-foreground font-sans line-clamp-2">
                               {item.title}
                             </h3>
-                            {item.quote && (
-                              <p className="text-xs text-muted-foreground leading-relaxed mb-2 line-clamp-2 italic border-l-2 border-primary/20 pl-2">
-                                "{item.quote.slice(0, 80)}..."
+                            <p className="text-xs text-muted-foreground mt-2">
+                              {item.source} · {new Date(item.publishedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                            {item.summary && (
+                              <p className="text-sm text-muted-foreground/80 mt-2 leading-relaxed line-clamp-2">
+                                {item.summary}
                               </p>
                             )}
-                            <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                              <span>橘鸦AI早报</span>
-                              <span className="flex items-center gap-0.5">
-                                <ArrowRight className="w-2.5 h-2.5" />
-                                原文
-                              </span>
-                            </div>
-                          </div>
-                        </a>
-                      ))}
-                    </div>
-                  </section>
-                );
-              })}
-            </div>
-
-            {/* Right sidebar */}
-            <aside className="w-52 shrink-0 hidden lg:block space-y-6">
-              {/* Hot keywords */}
-              {hotKeywords.length > 0 && (
-                <div>
-                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                    热门话题
-                  </h3>
-                  <div className="space-y-2">
-                    {hotKeywords.map((topic) => (
-                      <div
-                        key={topic}
-                        className="flex items-center gap-2 text-sm text-foreground/80 hover:text-primary cursor-pointer transition-colors"
-                      >
-                        <Hash className="w-3.5 h-3.5 text-muted-foreground" />
-                        {topic}
+                          </Link>
+                        ))}
                       </div>
-                    ))}
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground text-sm">
+                        该分类暂无资讯
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
 
-              {/* Category quick nav */}
-              <div>
-                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                  分类导航
-                </h3>
-                <div className="space-y-1.5">
-                  {activeCategories.map((catData) => {
-                    const cat = catData.category;
-                    const IconComponent = categoryIcons[cat];
-                    const count = catData.items.length;
-                    return (
-                      <a
-                        key={cat}
-                        href={`#${encodeURIComponent(cat)}`}
-                        className="flex items-center gap-2 text-sm text-foreground/80 hover:text-primary transition-colors py-0.5"
+                  {/* 底部：查看日报 */}
+                  <div className="px-6 pb-5">
+                    <div className="border-t border-border/20 pt-4">
+                      <Link
+                        href={`/daily?date=${day.date}`}
+                        className="text-sm text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors"
                       >
-                        {IconComponent && <IconComponent className="w-3.5 h-3.5" />}
-                        <span className="flex-1">{cat}</span>
-                        <span className="text-[10px] text-muted-foreground">{count}</span>
-                      </a>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Quick links */}
-              <div>
-                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                  导航
-                </h3>
-                <div className="space-y-2">
-                  <Link
-                    href="/daily"
-                    className="flex items-center gap-2 text-sm text-foreground/80 hover:text-primary transition-colors"
-                  >
-                    <span className="w-3.5 h-3.5 text-primary text-xs font-bold flex items-center justify-center">W</span>
-                    AI 日报
-                  </Link>
-                  <Link
-                    href="/leaderboard"
-                    className="flex items-center gap-2 text-sm text-foreground/80 hover:text-primary transition-colors"
-                  >
-                    <span className="w-3.5 h-3.5 text-primary text-xs font-bold flex items-center justify-center">L</span>
-                    排行榜
-                  </Link>
-                  <a
-                    href="/api/rss"
-                    className="flex items-center gap-2 text-sm text-foreground/80 hover:text-primary transition-colors"
-                  >
-                    <span className="w-3.5 h-3.5 text-primary text-xs font-bold flex items-center justify-center">R</span>
-                    RSS 订阅
-                  </a>
-                </div>
-              </div>
-            </aside>
+                        查看完整日报
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </Link>
+                    </div>
+                  </div>
+                </section>
+              );
+            })}
           </div>
         )}
       </main>

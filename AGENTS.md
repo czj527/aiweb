@@ -27,7 +27,7 @@ AI Pulse 是一个 AI 资讯聚合网站，核心功能包括：
 src/
 ├── app/
 │   ├── layout.tsx              # 根布局（Playfair Display + Noto Serif SC 字体）
-│   ├── page.tsx                # 首页 - 今日热点资讯 (过去24h Top 10)
+│   ├── page.tsx                # 首页 - 最近7天资讯，每天一个大卡片（分类标签+资讯网格）
 │   ├── globals.css             # 全局样式 + Design Token (27 variables)
 │   ├── leaderboard/
 │   │   └── page.tsx            # 大模型排行榜页 (DataLearner 6维度)
@@ -95,7 +95,7 @@ src/
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | /api/hot?hours=24&limit=10 | 获取最近N小时热点新闻（首页用） |
+| GET | /api/news/recent?days=7 | 获取最近N天资讯，按日期和分类分组（首页用） |
 | GET | /api/daily?list=true | 获取往期日报列表 |
 | GET | /api/daily?date=YYYY-MM-DD | 获取指定日期日报 |
 | GET | /api/daily | 获取最新日报（含全部新闻） |

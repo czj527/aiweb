@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { Navbar } from '@/components/navbar';
 import {
   Calendar,
@@ -148,9 +149,16 @@ export default function DailyPage() {
     }
   }, []);
 
+  const searchParams = useSearchParams();
+
   useEffect(() => {
-    loadLatest();
-  }, [loadLatest]);
+    const dateParam = searchParams.get('date');
+    if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+      loadByDate(dateParam);
+    } else {
+      loadLatest();
+    }
+  }, [loadLatest, loadByDate, searchParams]);
 
   const handleTabChange = (m: ViewMode) => {
     setMode(m);

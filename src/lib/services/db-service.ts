@@ -679,6 +679,29 @@ export async function getAllNewsItems(
   return { items: items || [], total: count || 0 };
 }
 
+/**
+ * 获取指定日期范围的新闻（按日期+分类分组）
+ * 返回按 published_at 日期分组的资讯
+ */
+export async function getNewsByDateRange(
+  startDate: string,
+  endDate: string,
+  limitPerDay: number = 50
+): Promise<NewsItemRow[]> {
+  const client = getSupabaseClient();
+
+  const { data, error } = await client
+    .from("news_items")
+    .select("*")
+    .gte("published_at", `${startDate}T00:00:00`)
+    .lt("published_at", `${endDate}T23:59:59`)
+    .order("published_at", { ascending: false })
+    .limit(limitPerDay * 7);
+
+  if (error) throw new Error(`获取日期范围新闻失败: ${error.message}`);
+  return data || [];
+}
+
 export async function updateDailyReportNewsCount(
   reportId: string
 ): Promise<void> {
