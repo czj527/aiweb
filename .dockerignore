@@ -1,0 +1,17 @@
+node_modules
+.next
+.git
+.gitignore
+.coze
+.cozeproj
+*.md
+!README.md
+.env
+.env.local
+.env.*.local
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+coverage
+*.log

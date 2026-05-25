@@ -1,0 +1,28 @@
+{
+  "elements": [
+    {
+      "type": "html",
+      "options": {
+        "path": ".cozeproj/prototype/web/home.html"
+      },
+      "title": "AI日报",
+      "size": "web"
+    },
+    {
+      "type": "html",
+      "options": {
+        "path": ".cozeproj/prototype/web/leaderboard.html"
+      },
+      "title": "大模型排行榜",
+      "size": "web"
+    },
+    {
+      "type": "html",
+      "options": {
+        "path": ".cozeproj/prototype/web/detail.html"
+      },
+      "title": "新闻详情",
+      "size": "web"
+    }
+  ]
+}

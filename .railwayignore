@@ -1,0 +1,56 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Build outputs
+.next
+dist
+build
+out
+.rsbuild
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Development files
+.git
+.gitignore
+.coze
+.cozeproj
+AGENTS.md
+DESIGN.md
+PROJECT_SUMMARY.md
+项目规划.md
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs
+*.log
+
+# Testing
+coverage
+*.lcov
+.nyc_output
+
+# Editor
+*.md
+README.md
+
+# Scripts
+scripts
+
+# Lock files (already in Dockerfile)
+pnpm-lock.yaml
+package-lock.json

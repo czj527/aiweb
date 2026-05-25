@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <link href="https://lf-code-agent.coze.cn/obj/x-ai-cn/fonts/google/playfair-display-700.css" rel="stylesheet" />
+  <link href="https://lf-code-agent.coze.cn/obj/x-ai-cn/fonts/google/noto-serif-sc-400-700.css" rel="stylesheet" />
+
+  <script src="https://lf-code-agent.coze.cn/obj/x-ai-cn/cdn/jquery/jquery-3.7.1.min.js"></script>
+  <script src="https://lf-code-agent.coze.cn/obj/x-ai-cn/cdn/lucide/lucide-1.11.0.min.js"></script>
+  <script src="https://lf-code-agent.coze.cn/obj/x-ai-cn/cdn/tailwindcss/tailwindcss-browser-4.2.4.min.js"></script>
+
+  <style type="text/tailwindcss">
+    @theme {
+      /* === 品牌色 === */
+      --color-primary:              #111111;
+      --color-primary-container:    #2A2A2A;
+      --color-on-primary:           #F4F1EA;
+      /* === 背景 / 表面 === */
+      --color-background:                 #F4F1EA;
+      --color-surface-container-lowest:   #F8F6F0;
+      --color-surface:                    #FFFFFF;
+      --color-surface-container:          #EDE9E0;
+      --color-surface-container-high:     #E4DFD4;
+      --color-surface-container-highest:  #D8D1C4;
+      /* === 文字 === */
+      --color-on-surface:           #111111;
+      --color-on-surface-variant:   #6B665E;
+      /* === 功能色 === */
+      --color-success:  #22c55e;
+      --color-error:    #ef4444;
+      --color-warning:  #f59e0b;
+      /* === 边框 === */
+      --color-outline:          #111111;
+      --color-outline-variant:  #D8D1C4;
+      /* === 圆角 === */
+      --radius-sm:   0.125rem;
+      --radius-md:   0.25rem;
+      --radius-lg:   0.375rem;
+      --radius-xl:   0.5rem;
+      --radius-2xl:  0.75rem;
+      --radius-full: 9999px;
+      /* === 阴影 === */
+      --shadow-card:   0 2px 8px rgba(0,0,0,0.08);
+      --shadow-float:  0 10px 25px rgba(0,0,0,0.12);
+      --shadow-dialog: 0 25px 50px rgba(0,0,0,0.16);
+      /* === 字体 === */
+      --font-sans: "Noto Serif SC", Georgia, "Times New Roman", system-ui, serif;
+      --font-display: "Playfair Display", "Noto Serif SC", Georgia, serif;
+    }
+  </style>
+
+  <!-- 图片兜底 -->
+  <script>
+    document.addEventListener('error', function (e) {
+      const img = e.target;
+      if (img.tagName !== 'IMG' || img.dataset.fallback) return;
+      img.dataset.fallback = '1';
+      const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const cat = img.getAttribute('data-category') || '其他';
+      const alt = img.getAttribute('alt') || '';
+      const label = esc(alt.length > 8 ? alt.slice(0, 8) + '…' : alt);
+      const icons = { '人物': '👤', '自然风景': '🏞', '动物': '🐾', '建筑城市': '🏙', '运动体育': '⚽', '交通工具': '🚗', '食物': '🍽', '服饰时尚': '👗', '商业科技': '💼', '游戏娱乐': '🎮', '艺术': '🎨', '其他': '🖼' };
+      const icon = icons[cat] || '🖼';
+      const w = img.width || 400, h = img.height || 300;
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="100%" height="100%" fill="%23f3f4f6"/><text x="50%" y="45%" text-anchor="middle" font-size="${Math.min(w, h) * 0.18}" dominant-baseline="central">${icon}</text><text x="50%" y="68%" text-anchor="middle" font-size="${Math.min(w, h) * 0.07}" fill="%239ca3af" font-family="system-ui,sans-serif" dominant-baseline="central">${label}</text></svg>`;
+      img.src = 'data:image/svg+xml,' + svg;
+    }, true);
+  </script>
+</head>
+
+<body class="bg-background text-on-surface font-sans">
+
+  <!-- @nav:start 导航组件，不需要的页面则不要复制此段 -->
+  <header class="bg-surface sticky top-0 z-40 border-b border-outline-variant/30">
+    <div class="max-w-5xl mx-auto h-14 flex items-center justify-between px-6">
+      <a href="home.html" class="flex items-center gap-2.5">
+        <i data-lucide="newspaper" class="text-primary w-5 h-5"></i>
+        <span class="font-bold text-lg tracking-tight" style="font-family: var(--font-display);">AI Pulse</span>
+      </a>
+      <nav class="flex items-center gap-1">
+        <a href="home.html" class="px-3 py-1.5 text-sm font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-md transition-colors">AI日报</a>
+        <a href="leaderboard.html" class="px-3 py-1.5 text-sm font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-md transition-colors">排行榜</a>
+      </nav>
+    </div>
+  </header>
+  <!-- @nav:end 导航组件，不需要的页面则不要复制此段 -->
+
+  <!-- @main-content:start -->
+  <main class="max-w-4xl mx-auto px-6 py-10">
+
+    <!-- 面包屑导航 -->
+    <nav id="breadcrumb" class="flex items-center gap-1.5 text-xs text-on-surface-variant mb-8" aria-label="面包屑导航">
+      <a href="home.html" class="hover:text-on-surface transition-colors">AI日报</a>
+      <i data-lucide="chevron-right" class="w-3 h-3 text-on-surface-variant/50"></i>
+      <a href="home.html" class="hover:text-on-surface transition-colors">大模型动态</a>
+      <i data-lucide="chevron-right" class="w-3 h-3 text-on-surface-variant/50"></i>
+      <span class="text-on-surface truncate max-w-[200px]">DeepSeek R1 开源发布</span>
+    </nav>
+
+    <!-- 文章标题区 -->
+    <article>
+      <header class="mb-10">
+        <h1 id="article-title" class="text-3xl font-bold leading-snug mb-5" style="font-family: var(--font-display);">
+          DeepSeek R1 正式开源发布：性能比肩 OpenAI o1，推理模型进入开源时代
+        </h1>
+        <div class="flex items-center flex-wrap gap-3 text-xs text-on-surface-variant">
+          <!-- 分类标签 -->
+          <span id="category-tag" class="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-medium border border-primary/20 text-on-surface">大模型</span>
+          <span id="category-tag-2" class="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-medium border border-primary/20 text-on-surface">开源</span>
+          <!-- 来源 -->
+          <span class="flex items-center gap-1">
+            <i data-lucide="globe" class="w-3 h-3"></i>
+            机器之心
+          </span>
+          <!-- 分隔点 -->
+          <span class="text-on-surface-variant/40">·</span>
+          <!-- 发布时间 -->
+          <span class="flex items-center gap-1">
+            <i data-lucide="clock" class="w-3 h-3"></i>
+            2025年1月20日
+          </span>
+          <!-- 分隔点 -->
+          <span class="text-on-surface-variant/40">·</span>
+          <!-- 阅读时间 -->
+          <span class="flex items-center gap-1">
+            <i data-lucide="book-open" class="w-3 h-3"></i>
+            预计阅读 8 分钟
+          </span>
+        </div>
+      </header>
+
+      <!-- AI 摘要卡片 -->
+      <div id="ai-summary-card" class="bg-surface-container-lowest border-l-[3px] border-l-primary/60 rounded-r-lg p-5 mb-10 shadow-card">
+        <div class="flex items-center gap-2 mb-3">
+          <i data-lucide="sparkles" class="w-4 h-4 text-primary"></i>
+          <span class="text-xs font-bold tracking-wide text-on-surface">AI 摘要</span>
+        </div>
+        <p id="ai-summary-text" class="text-sm leading-relaxed text-on-surface">
+          DeepSeek 于 2025 年 1 月正式开源发布 R1 推理模型，在数学、代码和科学推理等基准测试中达到与 OpenAI o1 相当的水平。该模型采用纯强化学习路径训练，无需监督微调即可涌现出思维链推理能力，标志着推理模型正式进入开源时代。
+        </p>
+        <p class="text-[11px] text-on-surface-variant/60 mt-3">由 AI 自动生成，仅供参考</p>
+      </div>
+
+      <!-- 正文内容区 -->
+      <div id="article-body" class="space-y-6 text-[15px] leading-[1.8] text-on-surface mb-14">
+
+        <!-- 正文-第1段 -->
+        <p>
+          2025 年 1 月 20 日，中国 AI 实验室 DeepSeek 正式发布 R1 推理模型，并以 MIT 协议完全开源。这是首个在推理能力上比肩 OpenAI o1 的开源模型，意味着此前被闭源模型垄断的"慢思考"推理范式，正式向全球开发者和研究人员敞开大门。DeepSeek R1 的发布在 AI 社区引发了巨大反响，发布后数小时内 Hugging Face 仓库下载量即突破百万。
+        </p>
+
+        <!-- 正文-第2段 -->
+        <p>
+          DeepSeek R1 最引人注目的创新在于其训练方法。与传统大模型依赖大规模监督微调（SFT）不同，R1 采用了纯强化学习（RL）的训练路径：首先在基础模型上直接应用群体相对策略优化（GRPO），通过奖励信号引导模型自发产生思维链（Chain-of-Thought）推理行为。DeepSeek 团队在论文中指出，这种"无 SFT 冷启动"方案使模型在推理过程中涌现出自我验证、反思和长链规划等高级认知行为，而这些能力并非通过人工标注数据显式教授的。
+        </p>
+
+        <!-- 正文-第3段 -->
+        <p>
+          在基准测试方面，DeepSeek R1 表现极为亮眼。在 MATH-500 测试中，R1 取得 97.3% 的准确率，与 OpenAI o1 的 97.0% 基本持平；在 AIME 2024 数学竞赛中，R1 的通过率为 79.8%，仅略低于 o1 的 83.6%；在 Codeforces 编程竞赛评分中，R1 达到 2029 的 Elo 评分，同样处于与 o1 相当的竞争梯队。值得注意的是，在知识理解类基准（如 MMLU、GPQA Diamond）上，R1 同样展现出顶尖水平，证明其推理能力并非以牺牲通用知识为代价。
+        </p>
+
+        <!-- 正文-第4段 -->
+        <p>
+          从行业影响来看，DeepSeek R1 的开源具有里程碑意义。此前，推理增强模型一直是闭源商业模型的护城河——OpenAI 的 o1、o1-pro 等产品均通过 API 付费调用，而 R1 以 MIT 协议开放了完整权重，允许商业自由使用和二次开发。这意味着初创企业、学术机构和个人开发者都可以在本地部署高性能推理模型，而不再受限于闭源 API 的价格和使用条款。Hugging Face 联合创始人 Thomas Wolf 在社交媒体上评价道："这是开源 AI 社区的一个分水岭时刻。"
+        </p>
+
+        <!-- 正文-第5段 -->
+        <p>
+          不过，DeepSeek R1 也面临一些挑战。模型在非中英文语种上的推理能力仍有提升空间，部分多语言任务的输出质量明显低于英文；此外，纯 RL 训练路径虽然降低了标注成本，但训练过程中的奖励作弊（reward hacking）问题需要额外的规则约束来解决。DeepSeek 团队表示，后续将通过蒸馏技术发布更小参数的 R1 变体，并持续优化多语言推理能力。总体而言，DeepSeek R1 的开源标志着 2025 年 AI 推理民主化的开端，其影响将深远地改变大模型行业的竞争格局。
+        </p>
+
+      </div>
+    </article>
+
+    <!-- 分割线 -->
+    <hr class="border-outline-variant/20 mb-12" />
+
+    <!-- 多源视角区 -->
+    <section id="multi-source" class="mb-14">
+      <h2 class="text-lg font-bold text-on-surface mb-5 flex items-center gap-2">
+        <i data-lucide="layers" class="w-5 h-5 text-on-surface-variant"></i>
+        多源视角
+      </h2>
+      <div class="space-y-4">
+
+        <!-- 多源视角-源1 -->
+        <a id="source-link-1" href="#" target="_blank" rel="noopener noreferrer"
+           class="block bg-surface rounded-lg shadow-card p-5 hover:shadow-float transition-shadow group">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-xs font-semibold text-on-surface-variant bg-surface-container px-2 py-0.5 rounded-sm">TechCrunch</span>
+          </div>
+          <h3 class="text-sm font-semibold text-on-surface group-hover:text-primary/80 transition-colors mb-1.5">
+            DeepSeek R1 challenges OpenAI's reasoning model dominance with open-source release
+          </h3>
+          <p class="text-xs text-on-surface-variant leading-relaxed">
+            TechCrunch 报道了 DeepSeek R1 对 OpenAI o1 推理霸主地位的挑战，重点分析了 R1 开源后对全球 AI 开发者生态的潜在影响，以及美国 AI 公司面临的竞争压力。
+          </p>
+        </a>
+
+        <!-- 多源视角-源2 -->
+        <a id="source-link-2" href="#" target="_blank" rel="noopener noreferrer"
+           class="block bg-surface rounded-lg shadow-card p-5 hover:shadow-float transition-shadow group">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-xs font-semibold text-on-surface-variant bg-surface-container px-2 py-0.5 rounded-sm">量子位</span>
+          </div>
+          <h3 class="text-sm font-semibold text-on-surface group-hover:text-primary/80 transition-colors mb-1.5">
+            DeepSeek R1 详解：纯强化学习如何让模型学会"深度思考"
+          </h3>
+          <p class="text-xs text-on-surface-variant leading-relaxed">
+            量子位深入解读了 R1 的纯 RL 训练方法，详细剖析了 GRPO 算法如何在无监督微调的情况下让模型自发涌现出思维链推理能力。
+          </p>
+        </a>
+
+        <!-- 多源视角-源3 -->
+        <a id="source-link-3" href="#" target="_blank" rel="noopener noreferrer"
+           class="block bg-surface rounded-lg shadow-card p-5 hover:shadow-float transition-shadow group">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-xs font-semibold text-on-surface-variant bg-surface-container px-2 py-0.5 rounded-sm">Hugging Face Blog</span>
+          </div>
+          <h3 class="text-sm font-semibold text-on-surface group-hover:text-primary/80 transition-colors mb-1.5">
+            Open-Source Reasoning: How DeepSeek R1 Democratizes Chain-of-Thought AI
+          </h3>
+          <p class="text-xs text-on-surface-variant leading-relaxed">
+            Hugging Face 从开源生态视角分析了 R1 发布对社区的意义，讨论了 MIT 协议对商业部署的便利性，以及社区基于 R1 衍生模型的早期进展。
+          </p>
+        </a>
+
+      </div>
+    </section>
+
+    <!-- 分割线 -->
+    <hr class="border-outline-variant/20 mb-12" />
+
+    <!-- 相关推荐 -->
+    <section id="related-news" class="mb-14">
+      <h2 class="text-lg font-bold text-on-surface mb-5 flex items-center gap-2">
+        <i data-lucide="link" class="w-5 h-5 text-on-surface-variant"></i>
+        相关推荐
+      </h2>
+      <div class="space-y-3">
+
+        <!-- 相关推荐-新闻1 -->
+        <a id="related-item-1" href="detail.html?id=002"
+           class="block bg-surface rounded-lg shadow-card p-5 hover:shadow-float transition-shadow group">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-medium border border-primary/20 text-on-surface">开源</span>
+          </div>
+          <h3 class="text-sm font-semibold text-on-surface group-hover:text-primary/80 transition-colors mb-2">
+            Meta 发布 Llama 4：开源大模型首次在多模态推理上超越 GPT-4o
+          </h3>
+          <time class="text-xs text-on-surface-variant">2025年1月18日</time>
+        </a>
+
+        <!-- 相关推荐-新闻2 -->
+        <a id="related-item-2" href="detail.html?id=003"
+           class="block bg-surface rounded-lg shadow-card p-5 hover:shadow-float transition-shadow group">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-medium border border-primary/20 text-on-surface">大模型</span>
+          </div>
+          <h3 class="text-sm font-semibold text-on-surface group-hover:text-primary/80 transition-colors mb-2">
+            OpenAI o3-mini 发布：推理成本降低 60%，API 价格全面下调
+          </h3>
+          <time class="text-xs text-on-surface-variant">2025年1月17日</time>
+        </a>
+
+        <!-- 相关推荐-新闻3 -->
+        <a id="related-item-3" href="detail.html?id=004"
+           class="block bg-surface rounded-lg shadow-card p-5 hover:shadow-float transition-shadow group">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-medium border border-primary/20 text-on-surface">Agent</span>
+          </div>
+          <h3 class="text-sm font-semibold text-on-surface group-hover:text-primary/80 transition-colors mb-2">
+            Anthropic 发布 Claude Agent 框架：支持自主执行复杂多步骤任务
+          </h3>
+          <time class="text-xs text-on-surface-variant">2025年1月16日</time>
+        </a>
+
+      </div>
+    </section>
+
+    <!-- 底部返回按钮 -->
+    <div class="pt-4 pb-8">
+      <a id="btn-back-home" href="home.html"
+         class="inline-flex items-center gap-2 bg-surface-container text-on-surface px-5 py-2.5 rounded-md text-sm font-medium hover:bg-surface-container-high active:scale-[0.98] transition-all">
+        <i data-lucide="arrow-left" class="w-4 h-4"></i>
+        返回AI日报
+      </a>
+    </div>
+
+  </main>
+  <!-- @main-content:end -->
+
+  <script>
+    $(function () {
+
+      // 多源视角链接 - 点击后应实现：
+      // 1. 在新窗口打开对应源文章的原始URL
+      // 2. Mock 阶段使用 # 占位，正式上线后替换为真实外链
+      $('#source-link-1').on('click', function (e) {
+        e.preventDefault();
+        console.log('打开 TechCrunch 原文链接');
+        // window.open('https://techcrunch.com/...', '_blank');
+      });
+
+      $('#source-link-2').on('click', function (e) {
+        e.preventDefault();
+        console.log('打开量子位原文链接');
+        // window.open('https://www.qbitai.com/...', '_blank');
+      });
+
+      $('#source-link-3').on('click', function (e) {
+        e.preventDefault();
+        console.log('打开 Hugging Face Blog 原文链接');
+        // window.open('https://huggingface.co/blog/...', '_blank');
+      });
+
+      // 相关推荐卡片 - 点击跳转至对应新闻详情页
+      $('#related-item-1').on('click', function (e) {
+        e.preventDefault();
+        window.location.href = 'detail.html?id=002';
+      });
+
+      $('#related-item-2').on('click', function (e) {
+        e.preventDefault();
+        window.location.href = 'detail.html?id=003';
+      });
+
+      $('#related-item-3').on('click', function (e) {
+        e.preventDefault();
+        window.location.href = 'detail.html?id=004';
+      });
+
+    });
+  </script>
+
+  <script>lucide.createIcons();</script>
+</body>
+
+</html>

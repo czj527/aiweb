@@ -1,0 +1,1162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <link href="https://lf-code-agent.coze.cn/obj/x-ai-cn/fonts/google/playfair-display-700.css" rel="stylesheet" />
+  <link href="https://lf-code-agent.coze.cn/obj/x-ai-cn/fonts/google/noto-serif-sc-400-700.css" rel="stylesheet" />
+
+  <script src="https://lf-code-agent.coze.cn/obj/x-ai-cn/cdn/jquery/jquery-3.7.1.min.js"></script>
+  <script src="https://lf-code-agent.coze.cn/obj/x-ai-cn/cdn/lucide/lucide-1.11.0.min.js"></script>
+  <script src="https://lf-code-agent.coze.cn/obj/x-ai-cn/cdn/tailwindcss/tailwindcss-browser-4.2.4.min.js"></script>
+
+  <style type="text/tailwindcss">
+    @theme {
+      /* === 品牌色 === */
+      --color-primary:              #111111;
+      --color-primary-container:    #2A2A2A;
+      --color-on-primary:           #F4F1EA;
+      /* === 背景 / 表面 === */
+      --color-background:                 #F4F1EA;
+      --color-surface-container-lowest:   #F8F6F0;
+      --color-surface:                    #FFFFFF;
+      --color-surface-container:          #EDE9E0;
+      --color-surface-container-high:     #E4DFD4;
+      --color-surface-container-highest:  #D8D1C4;
+      /* === 文字 === */
+      --color-on-surface:           #111111;
+      --color-on-surface-variant:   #6B665E;
+      /* === 功能色 === */
+      --color-success:  #22c55e;
+      --color-error:    #ef4444;
+      --color-warning:  #f59e0b;
+      /* === 边框 === */
+      --color-outline:          #111111;
+      --color-outline-variant:  #D8D1C4;
+      /* === 圆角 === */
+      --radius-sm:   0.125rem;
+      --radius-md:   0.25rem;
+      --radius-lg:   0.375rem;
+      --radius-xl:   0.5rem;
+      --radius-2xl:  0.75rem;
+      --radius-full: 9999px;
+      /* === 阴影 === */
+      --shadow-card:   0 2px 8px rgba(0,0,0,0.08);
+      --shadow-float:  0 10px 25px rgba(0,0,0,0.12);
+      --shadow-dialog: 0 25px 50px rgba(0,0,0,0.16);
+      /* === 字体 === */
+      --font-sans: "Noto Serif SC", Georgia, "Times New Roman", system-ui, serif;
+      --font-display: "Playfair Display", "Noto Serif SC", Georgia, serif;
+    }
+  </style>
+
+  <!-- 图片兜底 -->
+  <script>
+    document.addEventListener('error', function (e) {
+      const img = e.target;
+      if (img.tagName !== 'IMG' || img.dataset.fallback) return;
+      img.dataset.fallback = '1';
+      const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const cat = img.getAttribute('data-category') || '其他';
+      const alt = img.getAttribute('alt') || '';
+      const label = esc(alt.length > 8 ? alt.slice(0, 8) + '…' : alt);
+      const icons = { '人物': '👤', '自然风景': '🏞', '动物': '🐾', '建筑城市': '🏙', '运动体育': '⚽', '交通工具': '🚗', '食物': '🍽', '服饰时尚': '👗', '商业科技': '💼', '游戏娱乐': '🎮', '艺术': '🎨', '其他': '🖼' };
+      const icon = icons[cat] || '🖼';
+      const w = img.width || 400, h = img.height || 300;
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="100%" height="100%" fill="%23f3f4f6"/><text x="50%" y="45%" text-anchor="middle" font-size="${Math.min(w, h) * 0.18}" dominant-baseline="central">${icon}</text><text x="50%" y="68%" text-anchor="middle" font-size="${Math.min(w, h) * 0.07}" fill="%239ca3af" font-family="system-ui,sans-serif" dominant-baseline="central">${label}</text></svg>`;
+      img.src = 'data:image/svg+xml,' + svg;
+    }, true);
+  </script>
+</head>
+
+<body class="bg-background text-on-surface font-sans">
+
+  <!-- @nav:start -->
+  <header class="bg-surface sticky top-0 z-40 border-b border-outline-variant/30">
+    <div class="max-w-5xl mx-auto h-14 flex items-center justify-between px-6">
+      <a href="home.html" class="flex items-center gap-2.5">
+        <i data-lucide="newspaper" class="text-primary w-5 h-5"></i>
+        <span class="font-bold text-lg tracking-tight" style="font-family: var(--font-display);">AI Pulse</span>
+      </a>
+      <nav class="flex items-center gap-1">
+        <a href="home.html" class="px-3 py-1.5 text-sm font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-md transition-colors">AI日报</a>
+        <a href="leaderboard.html" class="px-3 py-1.5 text-sm font-medium text-primary bg-primary/10 rounded-md transition-colors" aria-current="page">排行榜</a>
+      </nav>
+    </div>
+  </header>
+  <!-- @nav:end -->
+
+  <!-- @main-content:start -->
+  <main class="max-w-5xl mx-auto px-6 py-8">
+
+    <!-- 页面标题区 -->
+    <div class="mb-8">
+      <h1 class="text-3xl font-bold tracking-tight" style="font-family: var(--font-display);">大模型排行榜</h1>
+      <p class="text-sm text-on-surface-variant mt-1.5">基于多维度评测的全球大模型实力排名</p>
+      <p class="text-xs text-on-surface-variant/70 mt-1">最后更新：2025年7月18日</p>
+    </div>
+
+    <!-- 维度切换 Tab -->
+    <div id="dimension-tabs" class="flex items-center gap-1 mb-6 border-b border-outline-variant/30 pb-0">
+      <button id="tab-comprehensive" class="dimension-tab px-4 py-2.5 text-sm font-medium border-b-2 border-primary text-on-surface transition-colors" data-dimension="comprehensive">综合排名</button>
+      <button id="tab-code" class="dimension-tab px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-on-surface-variant hover:text-on-surface transition-colors" data-dimension="code">代码能力</button>
+      <button id="tab-reasoning" class="dimension-tab px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-on-surface-variant hover:text-on-surface transition-colors" data-dimension="reasoning">推理能力</button>
+      <button id="tab-chinese" class="dimension-tab px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-on-surface-variant hover:text-on-surface transition-colors" data-dimension="chinese">中文能力</button>
+      <button id="tab-multimodal" class="dimension-tab px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-on-surface-variant hover:text-on-surface transition-colors" data-dimension="multimodal">多模态</button>
+    </div>
+
+    <!-- 排行榜表格 -->
+    <div class="bg-surface rounded-lg shadow-card overflow-hidden mb-6">
+
+      <!-- 表头 -->
+      <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3 bg-surface-container text-xs font-semibold text-on-surface-variant uppercase tracking-wide">
+        <span>排名</span>
+        <span>模型名称</span>
+        <span>开发者</span>
+        <span>参数量</span>
+        <span>综合得分</span>
+        <span class="text-center">趋势</span>
+      </div>
+
+      <!-- 表格内容 - 综合排名维度 -->
+      <div id="table-body-comprehensive" class="dimension-table divide-y divide-outline-variant/30">
+
+        <!-- 列表-模型1 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 bg-primary/[0.04] hover:bg-primary/[0.07] transition-colors items-center">
+          <span class="text-base font-bold text-primary">1</span>
+          <span class="text-sm font-bold text-on-surface">GPT-4o</span>
+          <span class="text-xs text-on-surface-variant">OpenAI</span>
+          <span class="text-xs text-on-surface-variant">—</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary rounded-full" style="width: 94.6%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">94.6</span>
+          </div>
+          <span class="text-xs font-medium text-success text-center">↑ 1</span>
+        </div>
+
+        <!-- 列表-模型2 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 bg-primary/[0.04] hover:bg-primary/[0.07] transition-colors items-center">
+          <span class="text-base font-bold text-primary">2</span>
+          <span class="text-sm font-bold text-on-surface">Claude 3.5 Sonnet</span>
+          <span class="text-xs text-on-surface-variant">Anthropic</span>
+          <span class="text-xs text-on-surface-variant">—</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary rounded-full" style="width: 93.2%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">93.2</span>
+          </div>
+          <span class="text-xs font-medium text-success text-center">↑ 2</span>
+        </div>
+
+        <!-- 列表-模型3 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 bg-primary/[0.04] hover:bg-primary/[0.07] transition-colors items-center">
+          <span class="text-base font-bold text-primary">3</span>
+          <span class="text-sm font-bold text-on-surface">Gemini 2.5 Pro</span>
+          <span class="text-xs text-on-surface-variant">Google</span>
+          <span class="text-xs text-on-surface-variant">—</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary rounded-full" style="width: 92.8%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">92.8</span>
+          </div>
+          <span class="text-xs font-medium text-on-surface-variant text-center">→ 0</span>
+        </div>
+
+        <!-- 列表-模型4 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">4</span>
+          <span class="text-sm font-medium text-on-surface">DeepSeek R1</span>
+          <span class="text-xs text-on-surface-variant">DeepSeek</span>
+          <span class="text-xs text-on-surface-variant">671B</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/70 rounded-full" style="width: 91.5%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">91.5</span>
+          </div>
+          <span class="text-xs font-medium text-success text-center">↑ 3</span>
+        </div>
+
+        <!-- 列表-模型5 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">5</span>
+          <span class="text-sm font-medium text-on-surface">Llama 4 Maverick</span>
+          <span class="text-xs text-on-surface-variant">Meta</span>
+          <span class="text-xs text-on-surface-variant">400B</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/70 rounded-full" style="width: 90.7%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">90.7</span>
+          </div>
+          <span class="text-xs font-medium text-success text-center">↑ 1</span>
+        </div>
+
+        <!-- 列表-模型6 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">6</span>
+          <span class="text-sm font-medium text-on-surface">Qwen3-235B</span>
+          <span class="text-xs text-on-surface-variant">阿里云</span>
+          <span class="text-xs text-on-surface-variant">235B</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/70 rounded-full" style="width: 90.1%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">90.1</span>
+          </div>
+          <span class="text-xs font-medium text-success text-center">↑ 4</span>
+        </div>
+
+        <!-- 列表-模型7 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">7</span>
+          <span class="text-sm font-medium text-on-surface">GLM-4</span>
+          <span class="text-xs text-on-surface-variant">智谱AI</span>
+          <span class="text-xs text-on-surface-variant">—</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/70 rounded-full" style="width: 89.3%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">89.3</span>
+          </div>
+          <span class="text-xs font-medium text-error text-center">↓ 2</span>
+        </div>
+
+        <!-- 列表-模型8 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">8</span>
+          <span class="text-sm font-medium text-on-surface">Mistral Large 2</span>
+          <span class="text-xs text-on-surface-variant">Mistral AI</span>
+          <span class="text-xs text-on-surface-variant">123B</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/70 rounded-full" style="width: 88.6%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">88.6</span>
+          </div>
+          <span class="text-xs font-medium text-on-surface-variant text-center">→ 0</span>
+        </div>
+
+        <!-- 列表-模型9 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">9</span>
+          <span class="text-sm font-medium text-on-surface">Command R+</span>
+          <span class="text-xs text-on-surface-variant">Cohere</span>
+          <span class="text-xs text-on-surface-variant">104B</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/60 rounded-full" style="width: 87.9%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">87.9</span>
+          </div>
+          <span class="text-xs font-medium text-error text-center">↓ 1</span>
+        </div>
+
+        <!-- 列表-模型10 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">10</span>
+          <span class="text-sm font-medium text-on-surface">Yi-Lightning</span>
+          <span class="text-xs text-on-surface-variant">零一万物</span>
+          <span class="text-xs text-on-surface-variant">—</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/60 rounded-full" style="width: 87.2%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">87.2</span>
+          </div>
+          <span class="text-xs font-medium text-success text-center">↑ 2</span>
+        </div>
+
+        <!-- 列表-模型11 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">11</span>
+          <span class="text-sm font-medium text-on-surface">Grok-3</span>
+          <span class="text-xs text-on-surface-variant">xAI</span>
+          <span class="text-xs text-on-surface-variant">—</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/60 rounded-full" style="width: 86.8%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">86.8</span>
+          </div>
+          <span class="text-xs font-medium text-success text-center">↑ 1</span>
+        </div>
+
+        <!-- 列表-模型12 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">12</span>
+          <span class="text-sm font-medium text-on-surface">GPT-4 Turbo</span>
+          <span class="text-xs text-on-surface-variant">OpenAI</span>
+          <span class="text-xs text-on-surface-variant">—</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/60 rounded-full" style="width: 86.1%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">86.1</span>
+          </div>
+          <span class="text-xs font-medium text-error text-center">↓ 5</span>
+        </div>
+
+        <!-- 列表-模型13 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">13</span>
+          <span class="text-sm font-medium text-on-surface">Claude 3 Opus</span>
+          <span class="text-xs text-on-surface-variant">Anthropic</span>
+          <span class="text-xs text-on-surface-variant">—</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/60 rounded-full" style="width: 85.4%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">85.4</span>
+          </div>
+          <span class="text-xs font-medium text-error text-center">↓ 3</span>
+        </div>
+
+        <!-- 列表-模型14 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">14</span>
+          <span class="text-sm font-medium text-on-surface">Qwen3-32B</span>
+          <span class="text-xs text-on-surface-variant">阿里云</span>
+          <span class="text-xs text-on-surface-variant">32B</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/50 rounded-full" style="width: 84.7%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">84.7</span>
+          </div>
+          <span class="text-xs font-medium text-success text-center">↑ 1</span>
+        </div>
+
+        <!-- 列表-模型15 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">15</span>
+          <span class="text-sm font-medium text-on-surface">DeepSeek V3</span>
+          <span class="text-xs text-on-surface-variant">DeepSeek</span>
+          <span class="text-xs text-on-surface-variant">671B</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/50 rounded-full" style="width: 84.1%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">84.1</span>
+          </div>
+          <span class="text-xs font-medium text-on-surface-variant text-center">→ 0</span>
+        </div>
+
+        <!-- 列表-模型16 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">16</span>
+          <span class="text-sm font-medium text-on-surface">Llama 4 Scout</span>
+          <span class="text-xs text-on-surface-variant">Meta</span>
+          <span class="text-xs text-on-surface-variant">109B</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/50 rounded-full" style="width: 83.5%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">83.5</span>
+          </div>
+          <span class="text-xs font-medium text-on-surface-variant text-center">→ 0</span>
+        </div>
+
+        <!-- 列表-模型17 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">17</span>
+          <span class="text-sm font-medium text-on-surface">Gemma 3 27B</span>
+          <span class="text-xs text-on-surface-variant">Google</span>
+          <span class="text-xs text-on-surface-variant">27B</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/50 rounded-full" style="width: 82.3%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">82.3</span>
+          </div>
+          <span class="text-xs font-medium text-success text-center">↑ 2</span>
+        </div>
+
+        <!-- 列表-模型18 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">18</span>
+          <span class="text-sm font-medium text-on-surface">Phi-4</span>
+          <span class="text-xs text-on-surface-variant">Microsoft</span>
+          <span class="text-xs text-on-surface-variant">14B</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/50 rounded-full" style="width: 80.8%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">80.8</span>
+          </div>
+          <span class="text-xs font-medium text-success text-center">↑ 3</span>
+        </div>
+
+        <!-- 列表-模型19 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">19</span>
+          <span class="text-sm font-medium text-on-surface">Mistral Small 3</span>
+          <span class="text-xs text-on-surface-variant">Mistral AI</span>
+          <span class="text-xs text-on-surface-variant">24B</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/50 rounded-full" style="width: 79.2%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">79.2</span>
+          </div>
+          <span class="text-xs font-medium text-error text-center">↓ 1</span>
+        </div>
+
+        <!-- 列表-模型20 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">20</span>
+          <span class="text-sm font-medium text-on-surface">MiniMax-01</span>
+          <span class="text-xs text-on-surface-variant">MiniMax</span>
+          <span class="text-xs text-on-surface-variant">456B</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/50 rounded-full" style="width: 78.5%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">78.5</span>
+          </div>
+          <span class="text-xs font-medium text-on-surface-variant text-center">→ 0</span>
+        </div>
+
+      </div>
+
+      <!-- 表格内容 - 代码能力维度 -->
+      <div id="table-body-code" class="dimension-table hidden divide-y divide-outline-variant/30">
+
+        <!-- 列表-代码1 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 bg-primary/[0.04] hover:bg-primary/[0.07] transition-colors items-center">
+          <span class="text-base font-bold text-primary">1</span>
+          <span class="text-sm font-bold text-on-surface">Claude 3.5 Sonnet</span>
+          <span class="text-xs text-on-surface-variant">Anthropic</span>
+          <span class="text-xs text-on-surface-variant">—</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary rounded-full" style="width: 95.2%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">95.2</span>
+          </div>
+          <span class="text-xs font-medium text-on-surface-variant text-center">→ 0</span>
+        </div>
+
+        <!-- 列表-代码2 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 bg-primary/[0.04] hover:bg-primary/[0.07] transition-colors items-center">
+          <span class="text-base font-bold text-primary">2</span>
+          <span class="text-sm font-bold text-on-surface">GPT-4o</span>
+          <span class="text-xs text-on-surface-variant">OpenAI</span>
+          <span class="text-xs text-on-surface-variant">—</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary rounded-full" style="width: 93.8%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">93.8</span>
+          </div>
+          <span class="text-xs font-medium text-success text-center">↑ 1</span>
+        </div>
+
+        <!-- 列表-代码3 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 bg-primary/[0.04] hover:bg-primary/[0.07] transition-colors items-center">
+          <span class="text-base font-bold text-primary">3</span>
+          <span class="text-sm font-bold text-on-surface">DeepSeek R1</span>
+          <span class="text-xs text-on-surface-variant">DeepSeek</span>
+          <span class="text-xs text-on-surface-variant">671B</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary rounded-full" style="width: 92.4%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">92.4</span>
+          </div>
+          <span class="text-xs font-medium text-success text-center">↑ 2</span>
+        </div>
+
+        <!-- 列表-代码4 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">4</span>
+          <span class="text-sm font-medium text-on-surface">Gemini 2.5 Pro</span>
+          <span class="text-xs text-on-surface-variant">Google</span>
+          <span class="text-xs text-on-surface-variant">—</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/70 rounded-full" style="width: 91.1%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">91.1</span>
+          </div>
+          <span class="text-xs font-medium text-error text-center">↓ 1</span>
+        </div>
+
+        <!-- 列表-代码5 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">5</span>
+          <span class="text-sm font-medium text-on-surface">Llama 4 Maverick</span>
+          <span class="text-xs text-on-surface-variant">Meta</span>
+          <span class="text-xs text-on-surface-variant">400B</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/70 rounded-full" style="width: 89.6%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">89.6</span>
+          </div>
+          <span class="text-xs font-medium text-success text-center">↑ 1</span>
+        </div>
+
+        <!-- 列表-代码6 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">6</span>
+          <span class="text-sm font-medium text-on-surface">Qwen3-235B</span>
+          <span class="text-xs text-on-surface-variant">阿里云</span>
+          <span class="text-xs text-on-surface-variant">235B</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/70 rounded-full" style="width: 88.3%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">88.3</span>
+          </div>
+          <span class="text-xs font-medium text-on-surface-variant text-center">→ 0</span>
+        </div>
+
+        <!-- 列表-代码7 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">7</span>
+          <span class="text-sm font-medium text-on-surface">Grok-3</span>
+          <span class="text-xs text-on-surface-variant">xAI</span>
+          <span class="text-xs text-on-surface-variant">—</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/70 rounded-full" style="width: 87.5%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">87.5</span>
+          </div>
+          <span class="text-xs font-medium text-success text-center">↑ 2</span>
+        </div>
+
+        <!-- 列表-代码8 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">8</span>
+          <span class="text-sm font-medium text-on-surface">Mistral Large 2</span>
+          <span class="text-xs text-on-surface-variant">Mistral AI</span>
+          <span class="text-xs text-on-surface-variant">123B</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/70 rounded-full" style="width: 86.9%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">86.9</span>
+          </div>
+          <span class="text-xs font-medium text-error text-center">↓ 2</span>
+        </div>
+
+        <!-- 列表-代码9 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">9</span>
+          <span class="text-sm font-medium text-on-surface">Command R+</span>
+          <span class="text-xs text-on-surface-variant">Cohere</span>
+          <span class="text-xs text-on-surface-variant">104B</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/60 rounded-full" style="width: 85.4%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">85.4</span>
+          </div>
+          <span class="text-xs font-medium text-on-surface-variant text-center">→ 0</span>
+        </div>
+
+        <!-- 列表-代码10 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">10</span>
+          <span class="text-sm font-medium text-on-surface">GLM-4</span>
+          <span class="text-xs text-on-surface-variant">智谱AI</span>
+          <span class="text-xs text-on-surface-variant">—</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/60 rounded-full" style="width: 84.7%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">84.7</span>
+          </div>
+          <span class="text-xs font-medium text-error text-center">↓ 3</span>
+        </div>
+
+        <!-- 列表-代码11 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">11</span>
+          <span class="text-sm font-medium text-on-surface">Yi-Lightning</span>
+          <span class="text-xs text-on-surface-variant">零一万物</span>
+          <span class="text-xs text-on-surface-variant">—</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/60 rounded-full" style="width: 83.1%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">83.1</span>
+          </div>
+          <span class="text-xs font-medium text-success text-center">↑ 1</span>
+        </div>
+
+        <!-- 列表-代码12 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">12</span>
+          <span class="text-sm font-medium text-on-surface">Phi-4</span>
+          <span class="text-xs text-on-surface-variant">Microsoft</span>
+          <span class="text-xs text-on-surface-variant">14B</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/60 rounded-full" style="width: 82.5%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">82.5</span>
+          </div>
+          <span class="text-xs font-medium text-success text-center">↑ 2</span>
+        </div>
+
+      </div>
+
+      <!-- 表格内容 - 推理能力维度 -->
+      <div id="table-body-reasoning" class="dimension-table hidden divide-y divide-outline-variant/30">
+
+        <!-- 列表-推理1 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 bg-primary/[0.04] hover:bg-primary/[0.07] transition-colors items-center">
+          <span class="text-base font-bold text-primary">1</span>
+          <span class="text-sm font-bold text-on-surface">DeepSeek R1</span>
+          <span class="text-xs text-on-surface-variant">DeepSeek</span>
+          <span class="text-xs text-on-surface-variant">671B</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary rounded-full" style="width: 96.1%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">96.1</span>
+          </div>
+          <span class="text-xs font-medium text-success text-center">↑ 1</span>
+        </div>
+
+        <!-- 列表-推理2 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 bg-primary/[0.04] hover:bg-primary/[0.07] transition-colors items-center">
+          <span class="text-base font-bold text-primary">2</span>
+          <span class="text-sm font-bold text-on-surface">Gemini 2.5 Pro</span>
+          <span class="text-xs text-on-surface-variant">Google</span>
+          <span class="text-xs text-on-surface-variant">—</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary rounded-full" style="width: 94.7%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">94.7</span>
+          </div>
+          <span class="text-xs font-medium text-success text-center">↑ 1</span>
+        </div>
+
+        <!-- 列表-推理3 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 bg-primary/[0.04] hover:bg-primary/[0.07] transition-colors items-center">
+          <span class="text-base font-bold text-primary">3</span>
+          <span class="text-sm font-bold text-on-surface">GPT-4o</span>
+          <span class="text-xs text-on-surface-variant">OpenAI</span>
+          <span class="text-xs text-on-surface-variant">—</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary rounded-full" style="width: 93.5%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">93.5</span>
+          </div>
+          <span class="text-xs font-medium text-error text-center">↓ 2</span>
+        </div>
+
+        <!-- 列表-推理4 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">4</span>
+          <span class="text-sm font-medium text-on-surface">Claude 3.5 Sonnet</span>
+          <span class="text-xs text-on-surface-variant">Anthropic</span>
+          <span class="text-xs text-on-surface-variant">—</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/70 rounded-full" style="width: 91.8%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">91.8</span>
+          </div>
+          <span class="text-xs font-medium text-on-surface-variant text-center">→ 0</span>
+        </div>
+
+        <!-- 列表-推理5 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">5</span>
+          <span class="text-sm font-medium text-on-surface">Grok-3</span>
+          <span class="text-xs text-on-surface-variant">xAI</span>
+          <span class="text-xs text-on-surface-variant">—</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/70 rounded-full" style="width: 90.2%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">90.2</span>
+          </div>
+          <span class="text-xs font-medium text-success text-center">↑ 3</span>
+        </div>
+
+        <!-- 列表-推理6 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">6</span>
+          <span class="text-sm font-medium text-on-surface">Llama 4 Maverick</span>
+          <span class="text-xs text-on-surface-variant">Meta</span>
+          <span class="text-xs text-on-surface-variant">400B</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/70 rounded-full" style="width: 89.4%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">89.4</span>
+          </div>
+          <span class="text-xs font-medium text-error text-center">↓ 1</span>
+        </div>
+
+        <!-- 列表-推理7 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">7</span>
+          <span class="text-sm font-medium text-on-surface">Qwen3-235B</span>
+          <span class="text-xs text-on-surface-variant">阿里云</span>
+          <span class="text-xs text-on-surface-variant">235B</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/70 rounded-full" style="width: 88.6%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">88.6</span>
+          </div>
+          <span class="text-xs font-medium text-success text-center">↑ 1</span>
+        </div>
+
+        <!-- 列表-推理8 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">8</span>
+          <span class="text-sm font-medium text-on-surface">Claude 3 Opus</span>
+          <span class="text-xs text-on-surface-variant">Anthropic</span>
+          <span class="text-xs text-on-surface-variant">—</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/70 rounded-full" style="width: 87.3%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">87.3</span>
+          </div>
+          <span class="text-xs font-medium text-error text-center">↓ 2</span>
+        </div>
+
+        <!-- 列表-推理9 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">9</span>
+          <span class="text-sm font-medium text-on-surface">DeepSeek V3</span>
+          <span class="text-xs text-on-surface-variant">DeepSeek</span>
+          <span class="text-xs text-on-surface-variant">671B</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/60 rounded-full" style="width: 86.5%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">86.5</span>
+          </div>
+          <span class="text-xs font-medium text-on-surface-variant text-center">→ 0</span>
+        </div>
+
+        <!-- 列表-推理10 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">10</span>
+          <span class="text-sm font-medium text-on-surface">Mistral Large 2</span>
+          <span class="text-xs text-on-surface-variant">Mistral AI</span>
+          <span class="text-xs text-on-surface-variant">123B</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/60 rounded-full" style="width: 85.1%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">85.1</span>
+          </div>
+          <span class="text-xs font-medium text-on-surface-variant text-center">→ 0</span>
+        </div>
+
+      </div>
+
+      <!-- 表格内容 - 中文能力维度 -->
+      <div id="table-body-chinese" class="dimension-table hidden divide-y divide-outline-variant/30">
+
+        <!-- 列表-中文1 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 bg-primary/[0.04] hover:bg-primary/[0.07] transition-colors items-center">
+          <span class="text-base font-bold text-primary">1</span>
+          <span class="text-sm font-bold text-on-surface">Qwen3-235B</span>
+          <span class="text-xs text-on-surface-variant">阿里云</span>
+          <span class="text-xs text-on-surface-variant">235B</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary rounded-full" style="width: 95.8%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">95.8</span>
+          </div>
+          <span class="text-xs font-medium text-on-surface-variant text-center">→ 0</span>
+        </div>
+
+        <!-- 列表-中文2 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 bg-primary/[0.04] hover:bg-primary/[0.07] transition-colors items-center">
+          <span class="text-base font-bold text-primary">2</span>
+          <span class="text-sm font-bold text-on-surface">DeepSeek R1</span>
+          <span class="text-xs text-on-surface-variant">DeepSeek</span>
+          <span class="text-xs text-on-surface-variant">671B</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary rounded-full" style="width: 94.3%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">94.3</span>
+          </div>
+          <span class="text-xs font-medium text-success text-center">↑ 1</span>
+        </div>
+
+        <!-- 列表-中文3 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 bg-primary/[0.04] hover:bg-primary/[0.07] transition-colors items-center">
+          <span class="text-base font-bold text-primary">3</span>
+          <span class="text-sm font-bold text-on-surface">GLM-4</span>
+          <span class="text-xs text-on-surface-variant">智谱AI</span>
+          <span class="text-xs text-on-surface-variant">—</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary rounded-full" style="width: 93.6%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">93.6</span>
+          </div>
+          <span class="text-xs font-medium text-success text-center">↑ 2</span>
+        </div>
+
+        <!-- 列表-中文4 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">4</span>
+          <span class="text-sm font-medium text-on-surface">GPT-4o</span>
+          <span class="text-xs text-on-surface-variant">OpenAI</span>
+          <span class="text-xs text-on-surface-variant">—</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/70 rounded-full" style="width: 91.2%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">91.2</span>
+          </div>
+          <span class="text-xs font-medium text-error text-center">↓ 1</span>
+        </div>
+
+        <!-- 列表-中文5 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">5</span>
+          <span class="text-sm font-medium text-on-surface">Gemini 2.5 Pro</span>
+          <span class="text-xs text-on-surface-variant">Google</span>
+          <span class="text-xs text-on-surface-variant">—</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/70 rounded-full" style="width: 90.5%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">90.5</span>
+          </div>
+          <span class="text-xs font-medium text-on-surface-variant text-center">→ 0</span>
+        </div>
+
+        <!-- 列表-中文6 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">6</span>
+          <span class="text-sm font-medium text-on-surface">Claude 3.5 Sonnet</span>
+          <span class="text-xs text-on-surface-variant">Anthropic</span>
+          <span class="text-xs text-on-surface-variant">—</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/70 rounded-full" style="width: 89.1%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">89.1</span>
+          </div>
+          <span class="text-xs font-medium text-error text-center">↓ 2</span>
+        </div>
+
+        <!-- 列表-中文7 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">7</span>
+          <span class="text-sm font-medium text-on-surface">Yi-Lightning</span>
+          <span class="text-xs text-on-surface-variant">零一万物</span>
+          <span class="text-xs text-on-surface-variant">—</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/70 rounded-full" style="width: 88.4%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">88.4</span>
+          </div>
+          <span class="text-xs font-medium text-success text-center">↑ 1</span>
+        </div>
+
+        <!-- 列表-中文8 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">8</span>
+          <span class="text-sm font-medium text-on-surface">MiniMax-01</span>
+          <span class="text-xs text-on-surface-variant">MiniMax</span>
+          <span class="text-xs text-on-surface-variant">456B</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/70 rounded-full" style="width: 87.2%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">87.2</span>
+          </div>
+          <span class="text-xs font-medium text-success text-center">↑ 2</span>
+        </div>
+
+        <!-- 列表-中文9 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">9</span>
+          <span class="text-sm font-medium text-on-surface">Qwen3-32B</span>
+          <span class="text-xs text-on-surface-variant">阿里云</span>
+          <span class="text-xs text-on-surface-variant">32B</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/60 rounded-full" style="width: 86.7%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">86.7</span>
+          </div>
+          <span class="text-xs font-medium text-on-surface-variant text-center">→ 0</span>
+        </div>
+
+        <!-- 列表-中文10 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">10</span>
+          <span class="text-sm font-medium text-on-surface">DeepSeek V3</span>
+          <span class="text-xs text-on-surface-variant">DeepSeek</span>
+          <span class="text-xs text-on-surface-variant">671B</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/60 rounded-full" style="width: 85.9%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">85.9</span>
+          </div>
+          <span class="text-xs font-medium text-error text-center">↓ 1</span>
+        </div>
+
+      </div>
+
+      <!-- 表格内容 - 多模态维度 -->
+      <div id="table-body-multimodal" class="dimension-table hidden divide-y divide-outline-variant/30">
+
+        <!-- 列表-多模态1 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 bg-primary/[0.04] hover:bg-primary/[0.07] transition-colors items-center">
+          <span class="text-base font-bold text-primary">1</span>
+          <span class="text-sm font-bold text-on-surface">Gemini 2.5 Pro</span>
+          <span class="text-xs text-on-surface-variant">Google</span>
+          <span class="text-xs text-on-surface-variant">—</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary rounded-full" style="width: 96.4%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">96.4</span>
+          </div>
+          <span class="text-xs font-medium text-on-surface-variant text-center">→ 0</span>
+        </div>
+
+        <!-- 列表-多模态2 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 bg-primary/[0.04] hover:bg-primary/[0.07] transition-colors items-center">
+          <span class="text-base font-bold text-primary">2</span>
+          <span class="text-sm font-bold text-on-surface">GPT-4o</span>
+          <span class="text-xs text-on-surface-variant">OpenAI</span>
+          <span class="text-xs text-on-surface-variant">—</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary rounded-full" style="width: 94.8%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">94.8</span>
+          </div>
+          <span class="text-xs font-medium text-on-surface-variant text-center">→ 0</span>
+        </div>
+
+        <!-- 列表-多模态3 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 bg-primary/[0.04] hover:bg-primary/[0.07] transition-colors items-center">
+          <span class="text-base font-bold text-primary">3</span>
+          <span class="text-sm font-bold text-on-surface">Claude 3.5 Sonnet</span>
+          <span class="text-xs text-on-surface-variant">Anthropic</span>
+          <span class="text-xs text-on-surface-variant">—</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary rounded-full" style="width: 91.5%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">91.5</span>
+          </div>
+          <span class="text-xs font-medium text-success text-center">↑ 1</span>
+        </div>
+
+        <!-- 列表-多模态4 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">4</span>
+          <span class="text-sm font-medium text-on-surface">Qwen3-235B</span>
+          <span class="text-xs text-on-surface-variant">阿里云</span>
+          <span class="text-xs text-on-surface-variant">235B</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/70 rounded-full" style="width: 89.7%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">89.7</span>
+          </div>
+          <span class="text-xs font-medium text-success text-center">↑ 2</span>
+        </div>
+
+        <!-- 列表-多模态5 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">5</span>
+          <span class="text-sm font-medium text-on-surface">Llama 4 Maverick</span>
+          <span class="text-xs text-on-surface-variant">Meta</span>
+          <span class="text-xs text-on-surface-variant">400B</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/70 rounded-full" style="width: 88.3%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">88.3</span>
+          </div>
+          <span class="text-xs font-medium text-error text-center">↓ 1</span>
+        </div>
+
+        <!-- 列表-多模态6 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">6</span>
+          <span class="text-sm font-medium text-on-surface">GLM-4</span>
+          <span class="text-xs text-on-surface-variant">智谱AI</span>
+          <span class="text-xs text-on-surface-variant">—</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/70 rounded-full" style="width: 87.1%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">87.1</span>
+          </div>
+          <span class="text-xs font-medium text-on-surface-variant text-center">→ 0</span>
+        </div>
+
+        <!-- 列表-多模态7 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">7</span>
+          <span class="text-sm font-medium text-on-surface">DeepSeek R1</span>
+          <span class="text-xs text-on-surface-variant">DeepSeek</span>
+          <span class="text-xs text-on-surface-variant">671B</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/70 rounded-full" style="width: 85.8%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">85.8</span>
+          </div>
+          <span class="text-xs font-medium text-error text-center">↓ 2</span>
+        </div>
+
+        <!-- 列表-多模态8 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">8</span>
+          <span class="text-sm font-medium text-on-surface">Grok-3</span>
+          <span class="text-xs text-on-surface-variant">xAI</span>
+          <span class="text-xs text-on-surface-variant">—</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/70 rounded-full" style="width: 84.2%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">84.2</span>
+          </div>
+          <span class="text-xs font-medium text-success text-center">↑ 1</span>
+        </div>
+
+        <!-- 列表-多模态9 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">9</span>
+          <span class="text-sm font-medium text-on-surface">Mistral Large 2</span>
+          <span class="text-xs text-on-surface-variant">Mistral AI</span>
+          <span class="text-xs text-on-surface-variant">123B</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/60 rounded-full" style="width: 82.6%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">82.6</span>
+          </div>
+          <span class="text-xs font-medium text-on-surface-variant text-center">→ 0</span>
+        </div>
+
+        <!-- 列表-多模态10 -->
+        <div class="grid grid-cols-[3rem_1fr_6rem_5rem_8rem_4rem] px-5 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-semibold text-on-surface">10</span>
+          <span class="text-sm font-medium text-on-surface">Gemma 3 27B</span>
+          <span class="text-xs text-on-surface-variant">Google</span>
+          <span class="text-xs text-on-surface-variant">27B</span>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full bg-primary/60 rounded-full" style="width: 80.3%"></div>
+            </div>
+            <span class="text-sm font-semibold text-on-surface w-9 text-right">80.3</span>
+          </div>
+          <span class="text-xs font-medium text-success text-center">↑ 2</span>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- 表格底部说明 -->
+    <div class="mb-10">
+      <p class="text-xs text-on-surface-variant/70">评分基于公开基准测试综合计算，仅供参考</p>
+      <p class="text-xs text-on-surface-variant/70 mt-0.5">数据更新日期：2025年7月18日</p>
+    </div>
+
+    <!-- 评测维度说明卡片 -->
+    <div class="bg-surface rounded-lg shadow-card p-5">
+      <h2 class="text-base font-semibold text-on-surface mb-3">评测维度说明</h2>
+      <p class="text-sm text-on-surface-variant leading-relaxed mb-4">综合排名基于以下公开基准测试加权计算，各维度权重依据测试覆盖面与社区认可度综合确定。</p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div class="bg-surface-container rounded-md px-4 py-3">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-sm font-medium text-on-surface">MMLU / 知识理解</span>
+            <span class="text-xs font-semibold text-primary">权重 25%</span>
+          </div>
+          <p class="text-xs text-on-surface-variant">大规模多任务语言理解，覆盖57个学科</p>
+        </div>
+        <div class="bg-surface-container rounded-md px-4 py-3">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-sm font-medium text-on-surface">HumanEval / 代码生成</span>
+            <span class="text-xs font-semibold text-primary">权重 20%</span>
+          </div>
+          <p class="text-xs text-on-surface-variant">Python函数编写能力，衡量代码生成水平</p>
+        </div>
+        <div class="bg-surface-container rounded-md px-4 py-3">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-sm font-medium text-on-surface">Arena Elo / 人类偏好</span>
+            <span class="text-xs font-semibold text-primary">权重 20%</span>
+          </div>
+          <p class="text-xs text-on-surface-variant">基于真实用户盲测对战的Elo评分</p>
+        </div>
+        <div class="bg-surface-container rounded-md px-4 py-3">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-sm font-medium text-on-surface">MT-Bench / 多轮对话</span>
+            <span class="text-xs font-semibold text-primary">权重 15%</span>
+          </div>
+          <p class="text-xs text-on-surface-variant">多轮对话能力，评估连贯性与指令遵循</p>
+        </div>
+        <div class="bg-surface-container rounded-md px-4 py-3">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-sm font-medium text-on-surface">MATH / 数学推理</span>
+            <span class="text-xs font-semibold text-primary">权重 10%</span>
+          </div>
+          <p class="text-xs text-on-surface-variant">竞赛级数学问题求解能力</p>
+        </div>
+        <div class="bg-surface-container rounded-md px-4 py-3">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-sm font-medium text-on-surface">MMMU / 多模态理解</span>
+            <span class="text-xs font-semibold text-primary">权重 10%</span>
+          </div>
+          <p class="text-xs text-on-surface-variant">跨模态理解与推理，涵盖图文音视频</p>
+        </div>
+      </div>
+    </div>
+
+  </main>
+  <!-- @main-content:end -->
+
+  <script>
+  $(function() {
+
+    // 维度切换 Tab 交互
+    $('#dimension-tabs').on('click', '.dimension-tab', function() {
+      var $tab = $(this);
+      var dimension = $tab.data('dimension');
+
+      // 更新 Tab 激活态
+      $('.dimension-tab').removeClass('border-primary text-on-surface').addClass('border-transparent text-on-surface-variant');
+      $tab.removeClass('border-transparent text-on-surface-variant').addClass('border-primary text-on-surface');
+
+      // 切换对应维度的表格
+      $('.dimension-table').addClass('hidden');
+      $('#table-body-' + dimension).removeClass('hidden');
+    });
+
+  });
+  </script>
+
+  <script>lucide.createIcons();</script>
+</body>
+
+</html>
