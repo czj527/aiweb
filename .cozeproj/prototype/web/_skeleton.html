@@ -5,8 +5,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <link href="https://lf-code-agent.coze.cn/obj/x-ai-cn/fonts/google/playfair-display-700.css" rel="stylesheet" />
-  <link href="https://lf-code-agent.coze.cn/obj/x-ai-cn/fonts/google/noto-serif-sc-400-700.css" rel="stylesheet" />
+  <link href="https://lf-code-agent.coze.cn/obj/x-ai-cn/fonts/google/google-all-fonts.css" rel="stylesheet"/>
 
   <script src="https://lf-code-agent.coze.cn/obj/x-ai-cn/cdn/jquery/jquery-3.7.1.min.js"></script>
   <script src="https://lf-code-agent.coze.cn/obj/x-ai-cn/cdn/lucide/lucide-1.11.0.min.js"></script>
@@ -14,11 +13,11 @@
 
   <style type="text/tailwindcss">
     @theme {
-      /* === 品牌色 === */
+      /* === 品牌色（杂志风：黑白克制） === */
       --color-primary:              #111111;
       --color-primary-container:    #2A2A2A;
       --color-on-primary:           #F4F1EA;
-      /* === 背景 / 表面 === */
+      /* === 背景 / 表面（暖色纸张底色） === */
       --color-background:                 #F4F1EA;
       --color-surface-container-lowest:   #F8F6F0;
       --color-surface:                    #FFFFFF;
@@ -33,7 +32,7 @@
       --color-error:    #ef4444;
       --color-warning:  #f59e0b;
       /* === 边框 === */
-      --color-outline:          #111111;
+      --color-outline:          #D8D1C4;
       --color-outline-variant:  #D8D1C4;
       /* === 圆角 === */
       --radius-sm:   0.125rem;
@@ -73,23 +72,29 @@
 
 <body class="bg-background text-on-surface font-sans">
 
-  <!-- @nav:start 导航组件，不需要的页面则不要复制此段 -->
-  <header class="bg-surface sticky top-0 z-40 border-b border-outline-variant/30">
-    <div class="max-w-5xl mx-auto h-14 flex items-center justify-between px-6">
-      <a href="home.html" class="flex items-center gap-2.5">
-        <i data-lucide="newspaper" class="text-primary w-5 h-5"></i>
-        <span class="font-bold text-lg tracking-tight" style="font-family: var(--font-display);">AI Pulse</span>
+  <!-- @nav:start 导航组件 -->
+  <header class="bg-surface sticky top-0 z-40 border-b border-outline-variant/20">
+    <div class="max-w-7xl mx-auto h-14 flex items-center justify-between px-6">
+      <a href="home.html" class="flex items-center gap-2">
+        <i data-lucide="zap" class="text-primary w-5 h-5"></i>
+        <span class="font-display font-bold text-lg text-on-surface">AI Pulse</span>
       </a>
       <nav class="flex items-center gap-1">
-        <a href="home.html" class="px-3 py-1.5 text-sm font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-md transition-colors">AI日报</a>
-        <a href="leaderboard.html" class="px-3 py-1.5 text-sm font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-md transition-colors">排行榜</a>
+        <a href="home.html" class="px-3 py-1.5 text-sm font-medium text-on-primary bg-primary rounded-md"
+           aria-current="page">首页</a>
+        <a href="/daily" class="px-3 py-1.5 text-sm font-medium text-on-surface-variant
+                           hover:text-on-surface hover:bg-surface-container rounded-md transition-colors">日报</a>
+        <a href="/leaderboard" class="px-3 py-1.5 text-sm font-medium text-on-surface-variant
+                           hover:text-on-surface hover:bg-surface-container rounded-md transition-colors">排行榜</a>
+        <a href="/admin" class="px-3 py-1.5 text-sm font-medium text-on-surface-variant
+                           hover:text-on-surface hover:bg-surface-container rounded-md transition-colors">管理</a>
       </nav>
     </div>
   </header>
-  <!-- @nav:end 导航组件，不需要的页面则不要复制此段 -->
+  <!-- @nav:end 导航组件 -->
 
   <!-- @main-content:start -->
-  <main class="max-w-5xl mx-auto px-6 py-8">
+  <main class="max-w-7xl mx-auto px-6 py-8">
   </main>
   <!-- @main-content:end -->
 

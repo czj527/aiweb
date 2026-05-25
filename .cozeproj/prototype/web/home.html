@@ -5,8 +5,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <link href="https://lf-code-agent.coze.cn/obj/x-ai-cn/fonts/google/playfair-display-700.css" rel="stylesheet" />
-  <link href="https://lf-code-agent.coze.cn/obj/x-ai-cn/fonts/google/noto-serif-sc-400-700.css" rel="stylesheet" />
+  <link href="https://lf-code-agent.coze.cn/obj/x-ai-cn/fonts/google/google-all-fonts.css" rel="stylesheet"/>
 
   <script src="https://lf-code-agent.coze.cn/obj/x-ai-cn/cdn/jquery/jquery-3.7.1.min.js"></script>
   <script src="https://lf-code-agent.coze.cn/obj/x-ai-cn/cdn/lucide/lucide-1.11.0.min.js"></script>
@@ -14,11 +13,11 @@
 
   <style type="text/tailwindcss">
     @theme {
-      /* === 品牌色 === */
+      /* === 品牌色（杂志风：黑白克制） === */
       --color-primary:              #111111;
       --color-primary-container:    #2A2A2A;
       --color-on-primary:           #F4F1EA;
-      /* === 背景 / 表面 === */
+      /* === 背景 / 表面（暖色纸张底色） === */
       --color-background:                 #F4F1EA;
       --color-surface-container-lowest:   #F8F6F0;
       --color-surface:                    #FFFFFF;
@@ -33,7 +32,7 @@
       --color-error:    #ef4444;
       --color-warning:  #f59e0b;
       /* === 边框 === */
-      --color-outline:          #111111;
+      --color-outline:          #D8D1C4;
       --color-outline-variant:  #D8D1C4;
       /* === 圆角 === */
       --radius-sm:   0.125rem;
@@ -73,621 +72,302 @@
 
 <body class="bg-background text-on-surface font-sans">
 
-  <!-- @nav:start -->
-  <header class="bg-surface sticky top-0 z-40 border-b border-outline-variant/30">
-    <div class="max-w-5xl mx-auto h-14 flex items-center justify-between px-6">
-      <a href="home.html" class="flex items-center gap-2.5">
-        <i data-lucide="newspaper" class="text-primary w-5 h-5"></i>
-        <span class="font-bold text-lg tracking-tight" style="font-family: var(--font-display);">AI Pulse</span>
+  <!-- @nav:start 导航组件 -->
+  <header class="bg-surface sticky top-0 z-40 border-b border-outline-variant/20">
+    <div class="max-w-7xl mx-auto h-14 flex items-center justify-between px-6">
+      <a href="home.html" class="flex items-center gap-2">
+        <i data-lucide="zap" class="text-primary w-5 h-5"></i>
+        <span class="font-display font-bold text-lg text-on-surface">AI Pulse</span>
       </a>
       <nav class="flex items-center gap-1">
-        <a href="home.html" class="px-3 py-1.5 text-sm font-medium text-primary bg-primary/10 rounded-md" aria-current="page">AI日报</a>
-        <a href="leaderboard.html" class="px-3 py-1.5 text-sm font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-md transition-colors">排行榜</a>
+        <a href="home.html" class="px-3 py-1.5 text-sm font-medium text-on-primary bg-primary rounded-md"
+           aria-current="page">首页</a>
+        <a href="/daily" class="px-3 py-1.5 text-sm font-medium text-on-surface-variant
+                           hover:text-on-surface hover:bg-surface-container rounded-md transition-colors">日报</a>
+        <a href="/leaderboard" class="px-3 py-1.5 text-sm font-medium text-on-surface-variant
+                           hover:text-on-surface hover:bg-surface-container rounded-md transition-colors">排行榜</a>
+        <a href="/admin" class="px-3 py-1.5 text-sm font-medium text-on-surface-variant
+                           hover:text-on-surface hover:bg-surface-container rounded-md transition-colors">管理</a>
       </nav>
     </div>
   </header>
-  <!-- @nav:end -->
+  <!-- @nav:end 导航组件 -->
 
   <!-- @main-content:start -->
-  <main class="max-w-5xl mx-auto px-6 py-8">
+  <main class="max-w-7xl mx-auto px-6 py-8">
 
-    <!-- 日期切换区 -->
-    <div class="flex items-center justify-between mb-6">
-      <div>
-        <!-- 日报标题 -->
-        <h1 id="page-title-daily" class="text-2xl font-bold text-on-surface" style="font-family: var(--font-display);">2026年7月9日 AI日报</h1>
-        <!-- 周报标题 -->
-        <h1 id="page-title-weekly" class="text-2xl font-bold text-on-surface hidden" style="font-family: var(--font-display);">2026年第28周 AI周报</h1>
-      </div>
-      <div class="flex items-center bg-surface-container rounded-md p-0.5">
-        <button id="tab-daily" class="px-4 py-1.5 text-sm font-medium rounded-md bg-surface text-on-surface shadow-sm transition-all">日报</button>
-        <button id="tab-weekly" class="px-4 py-1.5 text-sm font-medium rounded-md text-on-surface-variant hover:text-on-surface transition-all">周报</button>
-      </div>
-    </div>
+    <!-- 主卡片容器 -->
+    <div class="bg-surface shadow-card rounded-lg overflow-hidden">
 
-    <!-- 分类标签栏 -->
-    <div class="flex items-center gap-1 mb-8 overflow-x-auto pb-1">
-      <button id="cat-all" class="category-tag px-3 py-1 text-sm font-medium rounded-full bg-primary text-on-primary whitespace-nowrap transition-all">全部</button>
-      <button id="cat-model" class="category-tag px-3 py-1 text-sm font-medium rounded-full bg-surface-container text-on-surface-variant hover:text-on-surface whitespace-nowrap transition-all">大模型动态</button>
-      <button id="cat-opensource" class="category-tag px-3 py-1 text-sm font-medium rounded-full bg-surface-container text-on-surface-variant hover:text-on-surface whitespace-nowrap transition-all">开源项目</button>
-      <button id="cat-product" class="category-tag px-3 py-1 text-sm font-medium rounded-full bg-surface-container text-on-surface-variant hover:text-on-surface whitespace-nowrap transition-all">产品发布</button>
-      <button id="cat-policy" class="category-tag px-3 py-1 text-sm font-medium rounded-full bg-surface-container text-on-surface-variant hover:text-on-surface whitespace-nowrap transition-all">行业政策</button>
-      <button id="cat-research" class="category-tag px-3 py-1 text-sm font-medium rounded-full bg-surface-container text-on-surface-variant hover:text-on-surface whitespace-nowrap transition-all">学术研究</button>
-      <button id="cat-agent" class="category-tag px-3 py-1 text-sm font-medium rounded-full bg-surface-container text-on-surface-variant hover:text-on-surface whitespace-nowrap transition-all">Agent</button>
-    </div>
-
-    <!-- 主内容区：两栏布局 -->
-    <div class="flex gap-8">
-
-      <!-- 左侧：新闻内容 -->
-      <div class="flex-1 min-w-0">
-
-        <!-- ==================== 日报模式 ==================== -->
-        <div id="daily-content">
-
-          <!-- 日报概览区 -->
-          <div class="bg-surface rounded-lg shadow-card p-6 mb-8 border-l-2 border-primary">
-            <div class="flex items-center gap-2 mb-3">
-              <i data-lucide="sparkles" class="w-4 h-4 text-primary"></i>
-              <span class="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">AI 摘要</span>
-            </div>
-            <p class="text-sm leading-relaxed text-on-surface">今日AI领域最值得关注的三件事：OpenAI发布GPT-5 Turbo，推理速度提升3倍且成本降低60%；Google DeepMind开源Gemma 3，参数量从2B到27B覆盖多档位；Anthropic推出Claude Agent正式版，支持多步骤自主任务执行。整体趋势显示大模型正从对话能力向自主行动能力演进。</p>
-          </div>
-
-          <!-- 分类：大模型动态 -->
-          <div class="news-category mb-8" data-category="model">
-            <div class="flex items-center gap-3 mb-4 pb-2 border-b border-outline-variant/20">
-              <i data-lucide="brain" class="w-4 h-4 text-on-surface-variant"></i>
-              <h2 class="text-base font-bold text-on-surface">大模型动态</h2>
-              <span class="text-xs text-on-surface-variant">3 条</span>
-            </div>
-            <div class="space-y-3">
-              <!-- 列表-大模型动态1 -->
-              <a href="detail.html?id=1" class="news-card block bg-surface rounded-lg shadow-card p-4 hover:shadow-float transition-shadow cursor-pointer" data-category="model">
-                <h3 class="text-base font-bold text-on-surface mb-1.5 leading-snug">OpenAI 发布 GPT-5 Turbo：推理速度提升3倍，API成本降低60%</h3>
-                <p class="text-sm text-on-surface-variant leading-relaxed mb-3">OpenAI正式推出GPT-5 Turbo模型，在保持GPT-5级智能的同时，推理延迟降至原先的三分之一，API调用成本大幅下降。该模型采用新的推测解码架构，已向所有API用户开放。</p>
-                <div class="flex items-center gap-3 text-xs text-on-surface-variant">
-                  <span class="flex items-center gap-1"><i data-lucide="globe" class="w-3 h-3"></i>OpenAI Blog</span>
-                  <span>2026-07-09 08:30</span>
-                  <span class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant text-xs">大模型动态</span>
-                </div>
-              </a>
-              <!-- 列表-大模型动态2 -->
-              <a href="detail.html?id=2" class="news-card block bg-surface rounded-lg shadow-card p-4 hover:shadow-float transition-shadow cursor-pointer" data-category="model">
-                <h3 class="text-base font-bold text-on-surface mb-1.5 leading-snug">Claude 4 Sonnet 评测出炉：代码能力超越 GPT-5，多模态仍需追赶</h3>
-                <p class="text-sm text-on-surface-variant leading-relaxed mb-3">第三方基准测试显示，Anthropic的Claude 4 Sonnet在代码生成和长文本理解方面已超越GPT-5，但在多模态理解和图像生成方面仍有差距。测试覆盖SWE-bench、HumanEval等12项基准。</p>
-                <div class="flex items-center gap-3 text-xs text-on-surface-variant">
-                  <span class="flex items-center gap-1"><i data-lucide="globe" class="w-3 h-3"></i>机器之心</span>
-                  <span>2026-07-09 10:15</span>
-                  <span class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant text-xs">大模型动态</span>
-                </div>
-              </a>
-              <!-- 列表-大模型动态3 -->
-              <a href="detail.html?id=3" class="news-card block bg-surface rounded-lg shadow-card p-4 hover:shadow-float transition-shadow cursor-pointer" data-category="model">
-                <h3 class="text-base font-bold text-on-surface mb-1.5 leading-snug">Google Gemini 2.5 Pro 支持百万级上下文窗口，长文档处理能力大幅提升</h3>
-                <p class="text-sm text-on-surface-variant leading-relaxed mb-3">Google宣布Gemini 2.5 Pro的上下文窗口扩展至100万token，支持一次性处理完整代码仓库和长篇学术文献。该能力已通过Google AI Studio开放测试。</p>
-                <div class="flex items-center gap-3 text-xs text-on-surface-variant">
-                  <span class="flex items-center gap-1"><i data-lucide="globe" class="w-3 h-3"></i>Google AI Blog</span>
-                  <span>2026-07-09 14:20</span>
-                  <span class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant text-xs">大模型动态</span>
-                </div>
-              </a>
-            </div>
-          </div>
-
-          <!-- 分类：开源项目 -->
-          <div class="news-category mb-8" data-category="opensource">
-            <div class="flex items-center gap-3 mb-4 pb-2 border-b border-outline-variant/20">
-              <i data-lucide="git-branch" class="w-4 h-4 text-on-surface-variant"></i>
-              <h2 class="text-base font-bold text-on-surface">开源项目</h2>
-              <span class="text-xs text-on-surface-variant">3 条</span>
-            </div>
-            <div class="space-y-3">
-              <!-- 列表-开源项目1 -->
-              <a href="detail.html?id=4" class="news-card block bg-surface rounded-lg shadow-card p-4 hover:shadow-float transition-shadow cursor-pointer" data-category="opensource">
-                <h3 class="text-base font-bold text-on-surface mb-1.5 leading-snug">DeepMind 开源 Gemma 3：2B 到 27B 参数全覆盖，支持多语言</h3>
-                <p class="text-sm text-on-surface-variant leading-relaxed mb-3">Google DeepMind发布Gemma 3系列开源模型，提供2B、9B、27B三种参数规格，支持超过100种语言。该系列在同等参数规模下性能超越Llama 4，已上架Hugging Face。</p>
-                <div class="flex items-center gap-3 text-xs text-on-surface-variant">
-                  <span class="flex items-center gap-1"><i data-lucide="globe" class="w-3 h-3"></i>Hugging Face Blog</span>
-                  <span>2026-07-09 09:00</span>
-                  <span class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant text-xs">开源项目</span>
-                </div>
-              </a>
-              <!-- 列表-开源项目2 -->
-              <a href="detail.html?id=5" class="news-card block bg-surface rounded-lg shadow-card p-4 hover:shadow-float transition-shadow cursor-pointer" data-category="opensource">
-                <h3 class="text-base font-bold text-on-surface mb-1.5 leading-snug">Meta 发布 Llama 4 Scout 轻量版：单卡即可运行，专为端侧推理优化</h3>
-                <p class="text-sm text-on-surface-variant leading-relaxed mb-3">Meta推出Llama 4 Scout轻量版模型，参数量仅3B但性能接近Llama 3 8B。该模型针对移动端和嵌入式设备优化，支持INT4量化后仅1.5GB内存占用。</p>
-                <div class="flex items-center gap-3 text-xs text-on-surface-variant">
-                  <span class="flex items-center gap-1"><i data-lucide="globe" class="w-3 h-3"></i>Meta AI Blog</span>
-                  <span>2026-07-09 11:45</span>
-                  <span class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant text-xs">开源项目</span>
-                </div>
-              </a>
-              <!-- 列表-开源项目3 -->
-              <a href="detail.html?id=6" class="news-card block bg-surface rounded-lg shadow-card p-4 hover:shadow-float transition-shadow cursor-pointer" data-category="opensource">
-                <h3 class="text-base font-bold text-on-surface mb-1.5 leading-snug">Mistral 发布 Codestral 25.07：AI编程助手开源新标杆</h3>
-                <p class="text-sm text-on-surface-variant leading-relaxed mb-3">Mistral推出代码模型Codestral 25.07，在HumanEval上达到96.2%的通过率，超越所有同量级开源模型。支持80+编程语言，可无缝集成VS Code和JetBrains。</p>
-                <div class="flex items-center gap-3 text-xs text-on-surface-variant">
-                  <span class="flex items-center gap-1"><i data-lucide="globe" class="w-3 h-3"></i>GitHub Blog</span>
-                  <span>2026-07-09 16:30</span>
-                  <span class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant text-xs">开源项目</span>
-                </div>
-              </a>
-            </div>
-          </div>
-
-          <!-- 分类：产品发布 -->
-          <div class="news-category mb-8" data-category="product">
-            <div class="flex items-center gap-3 mb-4 pb-2 border-b border-outline-variant/20">
-              <i data-lucide="rocket" class="w-4 h-4 text-on-surface-variant"></i>
-              <h2 class="text-base font-bold text-on-surface">产品发布</h2>
-              <span class="text-xs text-on-surface-variant">3 条</span>
-            </div>
-            <div class="space-y-3">
-              <!-- 列表-产品发布1 -->
-              <a href="detail.html?id=7" class="news-card block bg-surface rounded-lg shadow-card p-4 hover:shadow-float transition-shadow cursor-pointer" data-category="product">
-                <h3 class="text-base font-bold text-on-surface mb-1.5 leading-snug">Anthropic 推出 Claude Agent 正式版：支持多步骤自主任务执行</h3>
-                <p class="text-sm text-on-surface-variant leading-relaxed mb-3">Anthropic发布Claude Agent正式版，可自主完成多步骤复杂任务，包括网页浏览、文件操作和API调用。该功能基于新的"计算机使用"能力构建，支持沙箱环境执行。</p>
-                <div class="flex items-center gap-3 text-xs text-on-surface-variant">
-                  <span class="flex items-center gap-1"><i data-lucide="globe" class="w-3 h-3"></i>Anthropic Blog</span>
-                  <span>2026-07-09 07:00</span>
-                  <span class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant text-xs">产品发布</span>
-                </div>
-              </a>
-              <!-- 列表-产品发布2 -->
-              <a href="detail.html?id=8" class="news-card block bg-surface rounded-lg shadow-card p-4 hover:shadow-float transition-shadow cursor-pointer" data-category="product">
-                <h3 class="text-base font-bold text-on-surface mb-1.5 leading-snug">Cursor 2.0 发布：AI编程全面升级，支持项目级代码理解和自动重构</h3>
-                <p class="text-sm text-on-surface-variant leading-relaxed mb-3">AI编程工具Cursor发布2.0版本，新增项目级代码理解能力，可跨文件追踪依赖关系并自动重构。集成的Agent模式可自主完成从需求到代码的完整开发流程。</p>
-                <div class="flex items-center gap-3 text-xs text-on-surface-variant">
-                  <span class="flex items-center gap-1"><i data-lucide="globe" class="w-3 h-3"></i>TechCrunch</span>
-                  <span>2026-07-09 12:00</span>
-                  <span class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant text-xs">产品发布</span>
-                </div>
-              </a>
-              <!-- 列表-产品发布3 -->
-              <a href="detail.html?id=9" class="news-card block bg-surface rounded-lg shadow-card p-4 hover:shadow-float transition-shadow cursor-pointer" data-category="product">
-                <h3 class="text-base font-bold text-on-surface mb-1.5 leading-snug">Perplexity 推出 Deep Research 功能：AI自主完成深度研究并生成报告</h3>
-                <p class="text-sm text-on-surface-variant leading-relaxed mb-3">Perplexity上线Deep Research功能，AI可自主进行数十轮搜索和网页阅读，最终生成结构化的研究报告。支持导出PDF和自动生成演示文稿，面向研究者和分析师群体。</p>
-                <div class="flex items-center gap-3 text-xs text-on-surface-variant">
-                  <span class="flex items-center gap-1"><i data-lucide="globe" class="w-3 h-3"></i>The Verge</span>
-                  <span>2026-07-09 15:10</span>
-                  <span class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant text-xs">产品发布</span>
-                </div>
-              </a>
-            </div>
-          </div>
-
-          <!-- 分类：行业政策 -->
-          <div class="news-category mb-8" data-category="policy">
-            <div class="flex items-center gap-3 mb-4 pb-2 border-b border-outline-variant/20">
-              <i data-lucide="landmark" class="w-4 h-4 text-on-surface-variant"></i>
-              <h2 class="text-base font-bold text-on-surface">行业政策</h2>
-              <span class="text-xs text-on-surface-variant">2 条</span>
-            </div>
-            <div class="space-y-3">
-              <!-- 列表-行业政策1 -->
-              <a href="detail.html?id=10" class="news-card block bg-surface rounded-lg shadow-card p-4 hover:shadow-float transition-shadow cursor-pointer" data-category="policy">
-                <h3 class="text-base font-bold text-on-surface mb-1.5 leading-snug">欧盟 AI 法案正式生效：高风险AI系统必须通过合规审查</h3>
-                <p class="text-sm text-on-surface-variant leading-relaxed mb-3">欧盟《人工智能法案》核心条款今日正式生效，所有高风险AI系统必须在6个月内完成合规审查。违规企业将面临最高全球营收6%的罚款，开源模型研发享有部分豁免。</p>
-                <div class="flex items-center gap-3 text-xs text-on-surface-variant">
-                  <span class="flex items-center gap-1"><i data-lucide="globe" class="w-3 h-3"></i>路透社</span>
-                  <span>2026-07-09 06:00</span>
-                  <span class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant text-xs">行业政策</span>
-                </div>
-              </a>
-              <!-- 列表-行业政策2 -->
-              <a href="detail.html?id=11" class="news-card block bg-surface rounded-lg shadow-card p-4 hover:shadow-float transition-shadow cursor-pointer" data-category="policy">
-                <h3 class="text-base font-bold text-on-surface mb-1.5 leading-snug">中国发布生成式AI安全评估新标准，要求模型提供商提交安全自评报告</h3>
-                <p class="text-sm text-on-surface-variant leading-relaxed mb-3">国家网信办联合多部门发布生成式AI安全评估新标准，要求所有向公众提供服务的AI模型在上线前提交安全自评报告，涵盖内容安全、数据保护和算法透明度三个维度。</p>
-                <div class="flex items-center gap-3 text-xs text-on-surface-variant">
-                  <span class="flex items-center gap-1"><i data-lucide="globe" class="w-3 h-3"></i>新华社</span>
-                  <span>2026-07-09 09:30</span>
-                  <span class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant text-xs">行业政策</span>
-                </div>
-              </a>
-            </div>
-          </div>
-
-          <!-- 分类：学术研究 -->
-          <div class="news-category mb-8" data-category="research">
-            <div class="flex items-center gap-3 mb-4 pb-2 border-b border-outline-variant/20">
-              <i data-lucide="graduation-cap" class="w-4 h-4 text-on-surface-variant"></i>
-              <h2 class="text-base font-bold text-on-surface">学术研究</h2>
-              <span class="text-xs text-on-surface-variant">2 条</span>
-            </div>
-            <div class="space-y-3">
-              <!-- 列表-学术研究1 -->
-              <a href="detail.html?id=12" class="news-card block bg-surface rounded-lg shadow-card p-4 hover:shadow-float transition-shadow cursor-pointer" data-category="research">
-                <h3 class="text-base font-bold text-on-surface mb-1.5 leading-snug">论文：思维树推理框架 ToT-2 显著提升大模型数学推理准确率</h3>
-                <p class="text-sm text-on-surface-variant leading-relaxed mb-3">普林斯顿大学研究团队发布ToT-2框架，通过动态剪枝和回溯搜索策略，使大模型在MATH基准上的准确率提升15个百分点。该方法无需额外训练，即插即用。</p>
-                <div class="flex items-center gap-3 text-xs text-on-surface-variant">
-                  <span class="flex items-center gap-1"><i data-lucide="globe" class="w-3 h-3"></i>arXiv</span>
-                  <span>2026-07-09 04:00</span>
-                  <span class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant text-xs">学术研究</span>
-                </div>
-              </a>
-              <!-- 列表-学术研究2 -->
-              <a href="detail.html?id=13" class="news-card block bg-surface rounded-lg shadow-card p-4 hover:shadow-float transition-shadow cursor-pointer" data-category="research">
-                <h3 class="text-base font-bold text-on-surface mb-1.5 leading-snug">DeepMind 研究：AI 发现新型数学证明思路，超越人类直觉</h3>
-                <p class="text-sm text-on-surface-variant leading-relaxed mb-3">DeepMind团队在Nature发表论文，展示AI系统AlphaProof在组合数学领域发现了3种全新证明路径，这些路径此前未被人类数学家注意。研究团队认为这可能改变数学研究的方式。</p>
-                <div class="flex items-center gap-3 text-xs text-on-surface-variant">
-                  <span class="flex items-center gap-1"><i data-lucide="globe" class="w-3 h-3"></i>Nature</span>
-                  <span>2026-07-09 13:00</span>
-                  <span class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant text-xs">学术研究</span>
-                </div>
-              </a>
-            </div>
-          </div>
-
-          <!-- 分类：Agent -->
-          <div class="news-category mb-8" data-category="agent">
-            <div class="flex items-center gap-3 mb-4 pb-2 border-b border-outline-variant/20">
-              <i data-lucide="bot" class="w-4 h-4 text-on-surface-variant"></i>
-              <h2 class="text-base font-bold text-on-surface">Agent</h2>
-              <span class="text-xs text-on-surface-variant">2 条</span>
-            </div>
-            <div class="space-y-3">
-              <!-- 列表-Agent1 -->
-              <a href="detail.html?id=14" class="news-card block bg-surface rounded-lg shadow-card p-4 hover:shadow-float transition-shadow cursor-pointer" data-category="agent">
-                <h3 class="text-base font-bold text-on-surface mb-1.5 leading-snug">OpenAI 上线 Operator Agent：可自主完成网页操作和在线购物</h3>
-                <p class="text-sm text-on-surface-variant leading-relaxed mb-3">OpenAI推出Operator Agent功能，可代替用户浏览网页、填写表单、完成在线购物等操作。采用"人类确认"安全机制，关键步骤需用户确认后执行。</p>
-                <div class="flex items-center gap-3 text-xs text-on-surface-variant">
-                  <span class="flex items-center gap-1"><i data-lucide="globe" class="w-3 h-3"></i>OpenAI Blog</span>
-                  <span>2026-07-09 10:00</span>
-                  <span class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant text-xs">Agent</span>
-                </div>
-              </a>
-              <!-- 列表-Agent2 -->
-              <a href="detail.html?id=15" class="news-card block bg-surface rounded-lg shadow-card p-4 hover:shadow-float transition-shadow cursor-pointer" data-category="agent">
-                <h3 class="text-base font-bold text-on-surface mb-1.5 leading-snug">AutoGPT 3.0 发布：多Agent协作框架支持千人级并行任务调度</h3>
-                <p class="text-sm text-on-surface-variant leading-relaxed mb-3">AutoGPT发布3.0版本，引入多Agent协作框架，支持多个AI Agent之间的任务分配、进度追踪和结果汇总。测试中成功协调超过1000个Agent并行完成软件测试任务。</p>
-                <div class="flex items-center gap-3 text-xs text-on-surface-variant">
-                  <span class="flex items-center gap-1"><i data-lucide="globe" class="w-3 h-3"></i>GitHub Blog</span>
-                  <span>2026-07-09 17:00</span>
-                  <span class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant text-xs">Agent</span>
-                </div>
-              </a>
-            </div>
-          </div>
-
-        </div>
-        <!-- 日报模式结束 -->
-
-        <!-- ==================== 周报模式 ==================== -->
-        <div id="weekly-content" class="hidden">
-
-          <!-- 周报概览区 -->
-          <div class="bg-surface rounded-lg shadow-card p-6 mb-8 border-l-2 border-primary">
-            <div class="flex items-center gap-2 mb-3">
-              <i data-lucide="sparkles" class="w-4 h-4 text-primary"></i>
-              <span class="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">本周概览</span>
-            </div>
-            <p class="text-sm leading-relaxed text-on-surface">本周AI领域迎来密集发布期：OpenAI和Anthropic同时在Agent赛道发力，分别推出GPT-5 Turbo和Claude Agent；开源社区方面，DeepMind和Meta相继开源新一代模型，参数效率和推理能力均有显著突破。政策层面，欧盟AI法案正式生效，中国也出台新标准，全球AI监管进入实质落地阶段。</p>
-          </div>
-
-          <!-- 趋势洞察 -->
-          <div class="bg-surface-container-lowest rounded-lg p-6 mb-8">
-            <div class="flex items-center gap-2 mb-3">
-              <i data-lucide="trending-up" class="w-4 h-4 text-on-surface-variant"></i>
-              <span class="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">趋势洞察</span>
-            </div>
-            <div class="space-y-3 text-sm leading-relaxed text-on-surface">
-              <p><span class="font-bold">趋势一：Agent成为主战场。</span>OpenAI、Anthropic同时推出Agent产品，标志着行业重心从对话式AI转向自主行动AI。预计下半年将有更多Agent框架和工具涌现。</p>
-              <p><span class="font-bold">趋势二：开源模型逼近闭源。</span>Gemma 3和Llama 4 Scout在各自参数量级上的表现已非常接近闭源模型，开源与闭源的性能差距正在快速缩小。</p>
-              <p><span class="font-bold">趋势三：AI编程工具进入2.0时代。</span>Cursor 2.0和Codestral代表AI编程从"补全助手"进化为"自主开发者"，项目级理解和自动重构能力正在改变软件工程流程。</p>
-            </div>
-          </div>
-
-          <!-- 周报分类：大模型动态 -->
-          <div class="news-category mb-8" data-category="model">
-            <div class="flex items-center gap-3 mb-4 pb-2 border-b border-outline-variant/20">
-              <i data-lucide="brain" class="w-4 h-4 text-on-surface-variant"></i>
-              <h2 class="text-base font-bold text-on-surface">大模型动态</h2>
-            </div>
-            <div class="space-y-3">
-              <!-- 列表-周报大模型1 -->
-              <a href="detail.html?id=1" class="news-card block bg-surface rounded-lg shadow-card p-4 hover:shadow-float transition-shadow cursor-pointer" data-category="model">
-                <h3 class="text-base font-bold text-on-surface mb-1.5 leading-snug">GPT-5 Turbo 发布，推理速度3倍提升</h3>
-                <p class="text-sm text-on-surface-variant leading-relaxed mb-3">OpenAI推出GPT-5 Turbo，采用推测解码架构实现3倍推理加速和60%成本下降。</p>
-                <div class="flex items-center gap-3 text-xs text-on-surface-variant">
-                  <span>OpenAI Blog</span>
-                  <span>7月9日</span>
-                  <span class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant">大模型动态</span>
-                </div>
-              </a>
-              <!-- 列表-周报大模型2 -->
-              <a href="detail.html?id=3" class="news-card block bg-surface rounded-lg shadow-card p-4 hover:shadow-float transition-shadow cursor-pointer" data-category="model">
-                <h3 class="text-base font-bold text-on-surface mb-1.5 leading-snug">Gemini 2.5 Pro 扩展至百万token上下文</h3>
-                <p class="text-sm text-on-surface-variant leading-relaxed mb-3">Google将Gemini 2.5 Pro上下文窗口扩展至100万token，可处理完整代码仓库。</p>
-                <div class="flex items-center gap-3 text-xs text-on-surface-variant">
-                  <span>Google AI Blog</span>
-                  <span>7月9日</span>
-                  <span class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant">大模型动态</span>
-                </div>
-              </a>
-            </div>
-          </div>
-
-          <!-- 周报分类：开源项目 -->
-          <div class="news-category mb-8" data-category="opensource">
-            <div class="flex items-center gap-3 mb-4 pb-2 border-b border-outline-variant/20">
-              <i data-lucide="git-branch" class="w-4 h-4 text-on-surface-variant"></i>
-              <h2 class="text-base font-bold text-on-surface">开源项目</h2>
-            </div>
-            <div class="space-y-3">
-              <!-- 列表-周报开源1 -->
-              <a href="detail.html?id=4" class="news-card block bg-surface rounded-lg shadow-card p-4 hover:shadow-float transition-shadow cursor-pointer" data-category="opensource">
-                <h3 class="text-base font-bold text-on-surface mb-1.5 leading-snug">Gemma 3 开源：2B-27B全参数覆盖</h3>
-                <p class="text-sm text-on-surface-variant leading-relaxed mb-3">DeepMind开源Gemma 3系列，支持100+语言，同参数规模性能超越Llama 4。</p>
-                <div class="flex items-center gap-3 text-xs text-on-surface-variant">
-                  <span>Hugging Face Blog</span>
-                  <span>7月9日</span>
-                  <span class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant">开源项目</span>
-                </div>
-              </a>
-              <!-- 列表-周报开源2 -->
-              <a href="detail.html?id=6" class="news-card block bg-surface rounded-lg shadow-card p-4 hover:shadow-float transition-shadow cursor-pointer" data-category="opensource">
-                <h3 class="text-base font-bold text-on-surface mb-1.5 leading-snug">Codestral 25.07：AI编程新标杆</h3>
-                <p class="text-sm text-on-surface-variant leading-relaxed mb-3">Mistral代码模型HumanEval达96.2%，支持80+语言和主流IDE集成。</p>
-                <div class="flex items-center gap-3 text-xs text-on-surface-variant">
-                  <span>GitHub Blog</span>
-                  <span>7月9日</span>
-                  <span class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant">开源项目</span>
-                </div>
-              </a>
-            </div>
-          </div>
-
-          <!-- 周报分类：Agent -->
-          <div class="news-category mb-8" data-category="agent">
-            <div class="flex items-center gap-3 mb-4 pb-2 border-b border-outline-variant/20">
-              <i data-lucide="bot" class="w-4 h-4 text-on-surface-variant"></i>
-              <h2 class="text-base font-bold text-on-surface">Agent</h2>
-            </div>
-            <div class="space-y-3">
-              <!-- 列表-周报Agent1 -->
-              <a href="detail.html?id=7" class="news-card block bg-surface rounded-lg shadow-card p-4 hover:shadow-float transition-shadow cursor-pointer" data-category="agent">
-                <h3 class="text-base font-bold text-on-surface mb-1.5 leading-snug">Claude Agent 正式版上线</h3>
-                <p class="text-sm text-on-surface-variant leading-relaxed mb-3">Anthropic发布Claude Agent，支持多步骤自主任务执行和沙箱环境操作。</p>
-                <div class="flex items-center gap-3 text-xs text-on-surface-variant">
-                  <span>Anthropic Blog</span>
-                  <span>7月9日</span>
-                  <span class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant">Agent</span>
-                </div>
-              </a>
-              <!-- 列表-周报Agent2 -->
-              <a href="detail.html?id=14" class="news-card block bg-surface rounded-lg shadow-card p-4 hover:shadow-float transition-shadow cursor-pointer" data-category="agent">
-                <h3 class="text-base font-bold text-on-surface mb-1.5 leading-snug">OpenAI Operator Agent 上线</h3>
-                <p class="text-sm text-on-surface-variant leading-relaxed mb-3">可自主完成网页操作和在线购物，关键步骤采用"人类确认"安全机制。</p>
-                <div class="flex items-center gap-3 text-xs text-on-surface-variant">
-                  <span>OpenAI Blog</span>
-                  <span>7月9日</span>
-                  <span class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant">Agent</span>
-                </div>
-              </a>
-            </div>
-          </div>
-
-          <!-- 周报分类：产品发布 -->
-          <div class="news-category mb-8" data-category="product">
-            <div class="flex items-center gap-3 mb-4 pb-2 border-b border-outline-variant/20">
-              <i data-lucide="rocket" class="w-4 h-4 text-on-surface-variant"></i>
-              <h2 class="text-base font-bold text-on-surface">产品发布</h2>
-            </div>
-            <div class="space-y-3">
-              <!-- 列表-周报产品1 -->
-              <a href="detail.html?id=8" class="news-card block bg-surface rounded-lg shadow-card p-4 hover:shadow-float transition-shadow cursor-pointer" data-category="product">
-                <h3 class="text-base font-bold text-on-surface mb-1.5 leading-snug">Cursor 2.0：项目级代码理解和自动重构</h3>
-                <p class="text-sm text-on-surface-variant leading-relaxed mb-3">AI编程工具进入Agent模式，可自主完成从需求到代码的完整开发流程。</p>
-                <div class="flex items-center gap-3 text-xs text-on-surface-variant">
-                  <span>TechCrunch</span>
-                  <span>7月9日</span>
-                  <span class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant">产品发布</span>
-                </div>
-              </a>
-            </div>
-          </div>
-
-          <!-- 周报分类：行业政策 -->
-          <div class="news-category mb-8" data-category="policy">
-            <div class="flex items-center gap-3 mb-4 pb-2 border-b border-outline-variant/20">
-              <i data-lucide="landmark" class="w-4 h-4 text-on-surface-variant"></i>
-              <h2 class="text-base font-bold text-on-surface">行业政策</h2>
-            </div>
-            <div class="space-y-3">
-              <!-- 列表-周报政策1 -->
-              <a href="detail.html?id=10" class="news-card block bg-surface rounded-lg shadow-card p-4 hover:shadow-float transition-shadow cursor-pointer" data-category="policy">
-                <h3 class="text-base font-bold text-on-surface mb-1.5 leading-snug">欧盟 AI 法案核心条款正式生效</h3>
-                <p class="text-sm text-on-surface-variant leading-relaxed mb-3">高风险AI系统须6个月内完成合规审查，违规罚款最高全球营收6%。</p>
-                <div class="flex items-center gap-3 text-xs text-on-surface-variant">
-                  <span>路透社</span>
-                  <span>7月9日</span>
-                  <span class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant">行业政策</span>
-                </div>
-              </a>
-            </div>
-          </div>
-
-        </div>
-        <!-- 周报模式结束 -->
-
+      <!-- 分类标签栏 -->
+      <div id="category-tabs" class="flex border-b border-outline-variant/15">
+        <!-- 分类1-大模型（12篇，最宽） -->
+        <button id="tab-llm" class="category-tab flex-1 px-6 py-4 text-sm font-medium text-center transition-colors bg-primary text-on-primary cursor-pointer whitespace-nowrap" style="flex: 12;" aria-current="page">
+          大模型
+        </button>
+        <!-- 分类2-应用（8篇） -->
+        <button id="tab-app" class="category-tab flex-1 px-6 py-4 text-sm font-medium text-center transition-colors bg-surface-container text-on-surface-variant cursor-pointer whitespace-nowrap hover:bg-surface-container-high" style="flex: 8;">
+          应用
+        </button>
+        <!-- 分类3-芯片（5篇） -->
+        <button id="tab-chip" class="category-tab flex-1 px-6 py-4 text-sm font-medium text-center transition-colors bg-surface-container text-on-surface-variant cursor-pointer whitespace-nowrap hover:bg-surface-container-high" style="flex: 5;">
+          芯片
+        </button>
+        <!-- 分类4-机器人（4篇） -->
+        <button id="tab-robot" class="category-tab flex-1 px-6 py-4 text-sm font-medium text-center transition-colors bg-surface-container text-on-surface-variant cursor-pointer whitespace-nowrap hover:bg-surface-container-high" style="flex: 4;">
+          机器人
+        </button>
+        <!-- 分类5-开源（3篇） -->
+        <button id="tab-opensource" class="category-tab flex-1 px-6 py-4 text-sm font-medium text-center transition-colors bg-surface-container text-on-surface-variant cursor-pointer whitespace-nowrap hover:bg-surface-container-high" style="flex: 3;">
+          开源
+        </button>
+        <!-- 分类6-政策（2篇） -->
+        <button id="tab-policy" class="category-tab flex-1 px-6 py-4 text-sm font-medium text-center transition-colors bg-surface-container text-on-surface-variant cursor-pointer whitespace-nowrap hover:bg-surface-container-high" style="flex: 2;">
+          政策
+        </button>
       </div>
 
-      <!-- 右侧：侧边信息 -->
-      <aside class="w-64 shrink-0 space-y-6">
+      <!-- 资讯卡片区域 -->
+      <div class="p-8">
 
-        <!-- 热门话题 -->
-        <div class="bg-surface rounded-lg shadow-card p-5">
-          <div class="flex items-center gap-2 mb-4">
-            <i data-lucide="flame" class="w-4 h-4 text-on-surface-variant"></i>
-            <h3 class="text-sm font-bold text-on-surface">热门话题</h3>
-          </div>
-          <div class="space-y-2.5">
-            <a href="#" id="topic-gpt5" class="flex items-center gap-2 text-sm text-on-surface hover:text-primary transition-colors">
-              <span class="w-5 h-5 rounded-full bg-primary text-on-primary text-xs flex items-center justify-center font-bold shrink-0">1</span>
-              <span>GPT-5 Turbo</span>
-            </a>
-            <a href="#" id="topic-claude-agent" class="flex items-center gap-2 text-sm text-on-surface hover:text-primary transition-colors">
-              <span class="w-5 h-5 rounded-full bg-surface-container-high text-on-surface text-xs flex items-center justify-center font-bold shrink-0">2</span>
-              <span>Claude Agent</span>
-            </a>
-            <a href="#" id="topic-gemma3" class="flex items-center gap-2 text-sm text-on-surface hover:text-primary transition-colors">
-              <span class="w-5 h-5 rounded-full bg-surface-container-high text-on-surface text-xs flex items-center justify-center font-bold shrink-0">3</span>
-              <span>Gemma 3 开源</span>
-            </a>
-            <a href="#" id="topic-ai-regulation" class="flex items-center gap-2 text-sm text-on-surface hover:text-primary transition-colors">
-              <span class="w-5 h-5 rounded-full bg-surface-container-high text-on-surface text-xs flex items-center justify-center font-bold shrink-0">4</span>
-              <span>AI 监管法规</span>
-            </a>
-            <a href="#" id="topic-cursor" class="flex items-center gap-2 text-sm text-on-surface hover:text-primary transition-colors">
-              <span class="w-5 h-5 rounded-full bg-surface-container-high text-on-surface text-xs flex items-center justify-center font-bold shrink-0">5</span>
-              <span>AI 编程工具</span>
-            </a>
-          </div>
+        <!-- 大模型分类资讯 -->
+        <div id="panel-llm" class="category-panel grid grid-cols-2 gap-x-12 gap-y-0">
+          <!-- 列表-大模型1 -->
+          <article class="py-5 border-b border-outline-variant/15 group cursor-pointer">
+            <h3 class="font-display font-bold text-base text-on-surface group-hover:text-primary transition-colors leading-snug">OpenAI GPT-5 发布：多模态推理能力大幅提升</h3>
+            <div class="flex items-center gap-3 mt-2.5 text-xs text-on-surface-variant">
+              <span>OpenAI 官方</span>
+              <span class="w-0.5 h-0.5 rounded-full bg-on-surface-variant/40"></span>
+              <span>2025-06-15</span>
+            </div>
+            <p class="text-sm text-on-surface-variant mt-2 leading-relaxed">GPT-5 在数学推理、代码生成和多模态理解方面实现了质的飞跃，基准测试全面超越前代模型。</p>
+          </article>
+          <!-- 列表-大模型2 -->
+          <article class="py-5 border-b border-outline-variant/15 group cursor-pointer">
+            <h3 class="font-display font-bold text-base text-on-surface group-hover:text-primary transition-colors leading-snug">DeepSeek-V3 开源：国产大模型新里程碑</h3>
+            <div class="flex items-center gap-3 mt-2.5 text-xs text-on-surface-variant">
+              <span>DeepSeek</span>
+              <span class="w-0.5 h-0.5 rounded-full bg-on-surface-variant/40"></span>
+              <span>2025-06-12</span>
+            </div>
+            <p class="text-sm text-on-surface-variant mt-2 leading-relaxed">DeepSeek-V3 采用 MoE 架构，总参数达 671B，激活参数 37B，性能逼近 GPT-4o 水平。</p>
+          </article>
+          <!-- 列表-大模型3 -->
+          <article class="py-5 border-b border-outline-variant/15 group cursor-pointer">
+            <h3 class="font-display font-bold text-base text-on-surface group-hover:text-primary transition-colors leading-snug">Claude 4 更新： Anthropic 推出新一代对话模型</h3>
+            <div class="flex items-center gap-3 mt-2.5 text-xs text-on-surface-variant">
+              <span>Anthropic</span>
+              <span class="w-0.5 h-0.5 rounded-full bg-on-surface-variant/40"></span>
+              <span>2025-06-10</span>
+            </div>
+            <p class="text-sm text-on-surface-variant mt-2 leading-relaxed">Claude 4 在长文本理解和指令遵循方面表现突出，支持 200K 上下文窗口，安全性进一步增强。</p>
+          </article>
+          <!-- 列表-大模型4 -->
+          <article class="py-5 border-b border-outline-variant/15 group cursor-pointer">
+            <h3 class="font-display font-bold text-base text-on-surface group-hover:text-primary transition-colors leading-snug">Gemini 2.5 Pro 登场：Google 的多模态野心</h3>
+            <div class="flex items-center gap-3 mt-2.5 text-xs text-on-surface-variant">
+              <span>Google DeepMind</span>
+              <span class="w-0.5 h-0.5 rounded-full bg-on-surface-variant/40"></span>
+              <span>2025-06-08</span>
+            </div>
+            <p class="text-sm text-on-surface-variant mt-2 leading-relaxed">Gemini 2.5 Pro 原生支持图像、视频和音频输入，在科学推理基准上创下新纪录。</p>
+          </article>
+          <!-- 列表-大模型5 -->
+          <article class="py-5 border-b border-outline-variant/15 group cursor-pointer">
+            <h3 class="font-display font-bold text-base text-on-surface group-hover:text-primary transition-colors leading-snug">Llama 4 发布：Meta 开源生态再进化</h3>
+            <div class="flex items-center gap-3 mt-2.5 text-xs text-on-surface-variant">
+              <span>Meta AI</span>
+              <span class="w-0.5 h-0.5 rounded-full bg-on-surface-variant/40"></span>
+              <span>2025-06-05</span>
+            </div>
+            <p class="text-sm text-on-surface-variant mt-2 leading-relaxed">Llama 4 系列包含 8B、70B 和 405B 三个规模，其中 405B 版本在多项评测中超越 GPT-4。</p>
+          </article>
+          <!-- 列表-大模型6 -->
+          <article class="py-5 border-b border-outline-variant/15 group cursor-pointer">
+            <h3 class="font-display font-bold text-base text-on-surface group-hover:text-primary transition-colors leading-snug">Mistral Large 更新：欧洲 AI 的强劲挑战</h3>
+            <div class="flex items-center gap-3 mt-2.5 text-xs text-on-surface-variant">
+              <span>Mistral AI</span>
+              <span class="w-0.5 h-0.5 rounded-full bg-on-surface-variant/40"></span>
+              <span>2025-06-02</span>
+            </div>
+            <p class="text-sm text-on-surface-variant mt-2 leading-relaxed">Mistral Large 新版本在函数调用和代码能力上显著提升，继续以更小参数实现更强性能。</p>
+          </article>
         </div>
 
-        <!-- 往期日报 -->
-        <div class="bg-surface rounded-lg shadow-card p-5">
-          <div class="flex items-center gap-2 mb-4">
-            <i data-lucide="calendar" class="w-4 h-4 text-on-surface-variant"></i>
-            <h3 class="text-sm font-bold text-on-surface">往期日报</h3>
-          </div>
-          <div class="space-y-1">
-            <!-- 列表-往期1 -->
-            <a href="#" id="past-0708" class="block px-2 py-1.5 text-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded transition-colors">
-              7月8日 周三
-            </a>
-            <!-- 列表-往期2 -->
-            <a href="#" id="past-0707" class="block px-2 py-1.5 text-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded transition-colors">
-              7月7日 周二
-            </a>
-            <!-- 列表-往期3 -->
-            <a href="#" id="past-0706" class="block px-2 py-1.5 text-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded transition-colors">
-              7月6日 周一
-            </a>
-            <!-- 列表-往期4 -->
-            <a href="#" id="past-0705" class="block px-2 py-1.5 text-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded transition-colors">
-              7月5日 周日
-            </a>
-            <!-- 列表-往期5 -->
-            <a href="#" id="past-0704" class="block px-2 py-1.5 text-sm text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded transition-colors">
-              7月4日 周六
-            </a>
-          </div>
+        <!-- 应用分类资讯 -->
+        <div id="panel-app" class="category-panel hidden grid grid-cols-2 gap-x-12 gap-y-0">
+          <!-- 列表-应用1 -->
+          <article class="py-5 border-b border-outline-variant/15 group cursor-pointer">
+            <h3 class="font-display font-bold text-base text-on-surface group-hover:text-primary transition-colors leading-snug">Cursor 完成 9 亿美元融资，AI 编程赛道持续火热</h3>
+            <div class="flex items-center gap-3 mt-2.5 text-xs text-on-surface-variant">
+              <span>36氪</span>
+              <span class="w-0.5 h-0.5 rounded-full bg-on-surface-variant/40"></span>
+              <span>2025-06-14</span>
+            </div>
+            <p class="text-sm text-on-surface-variant mt-2 leading-relaxed">Cursor 母公司 Anysphere 估值突破 90 亿美元，成为 AI 编程工具领域最大独角兽。</p>
+          </article>
+          <!-- 列表-应用2 -->
+          <article class="py-5 border-b border-outline-variant/15 group cursor-pointer">
+            <h3 class="font-display font-bold text-base text-on-surface group-hover:text-primary transition-colors leading-snug">Perplexity 搜索引擎月活突破 1 亿</h3>
+            <div class="flex items-center gap-3 mt-2.5 text-xs text-on-surface-variant">
+              <span>TechCrunch</span>
+              <span class="w-0.5 h-0.5 rounded-full bg-on-surface-variant/40"></span>
+              <span>2025-06-11</span>
+            </div>
+            <p class="text-sm text-on-surface-variant mt-2 leading-relaxed">Perplexity 以 AI 原生搜索体验迅速增长，正在重新定义用户获取信息的方式。</p>
+          </article>
+          <!-- 列表-应用3 -->
+          <article class="py-5 border-b border-outline-variant/15 group cursor-pointer">
+            <h3 class="font-display font-bold text-base text-on-surface group-hover:text-primary transition-colors leading-snug">AI 编程助手横评：Cursor vs Copilot vs Windsurf</h3>
+            <div class="flex items-center gap-3 mt-2.5 text-xs text-on-surface-variant">
+              <span>极客公园</span>
+              <span class="w-0.5 h-0.5 rounded-full bg-on-surface-variant/40"></span>
+              <span>2025-06-09</span>
+            </div>
+            <p class="text-sm text-on-surface-variant mt-2 leading-relaxed">三大 AI 编程工具在代码补全、项目理解和多文件编辑维度展开全面对比，各有优势。</p>
+          </article>
+          <!-- 列表-应用4 -->
+          <article class="py-5 border-b border-outline-variant/15 group cursor-pointer">
+            <h3 class="font-display font-bold text-base text-on-surface group-hover:text-primary transition-colors leading-snug">Sora 正式上线：OpenAI 视频生成模型面向公众开放</h3>
+            <div class="flex items-center gap-3 mt-2.5 text-xs text-on-surface-variant">
+              <span>OpenAI 官方</span>
+              <span class="w-0.5 h-0.5 rounded-full bg-on-surface-variant/40"></span>
+              <span>2025-06-06</span>
+            </div>
+            <p class="text-sm text-on-surface-variant mt-2 leading-relaxed">Sora 支持生成长达 2 分钟的高清视频，文本到视频的生成质量令人惊叹。</p>
+          </article>
         </div>
 
-      </aside>
+        <!-- 芯片分类资讯 -->
+        <div id="panel-chip" class="category-panel hidden grid grid-cols-2 gap-x-12 gap-y-0">
+          <!-- 列表-芯片1 -->
+          <article class="py-5 border-b border-outline-variant/15 group cursor-pointer">
+            <h3 class="font-display font-bold text-base text-on-surface group-hover:text-primary transition-colors leading-snug">NVIDIA B200 正式出货：Blackwell 架构重塑 AI 算力</h3>
+            <div class="flex items-center gap-3 mt-2.5 text-xs text-on-surface-variant">
+              <span>NVIDIA</span>
+              <span class="w-0.5 h-0.5 rounded-full bg-on-surface-variant/40"></span>
+              <span>2025-06-13</span>
+            </div>
+            <p class="text-sm text-on-surface-variant mt-2 leading-relaxed">B200 GPU 提供 20 PFLOPS FP4 算力，较 H100 提升 5 倍，大模型训练效率大幅跃升。</p>
+          </article>
+          <!-- 列表-芯片2 -->
+          <article class="py-5 border-b border-outline-variant/15 group cursor-pointer">
+            <h3 class="font-display font-bold text-base text-on-surface group-hover:text-primary transition-colors leading-snug">AMD MI350 系列发布：挑战 NVIDIA 数据中心霸主地位</h3>
+            <div class="flex items-center gap-3 mt-2.5 text-xs text-on-surface-variant">
+              <span>AMD</span>
+              <span class="w-0.5 h-0.5 rounded-full bg-on-surface-variant/40"></span>
+              <span>2025-06-07</span>
+            </div>
+            <p class="text-sm text-on-surface-variant mt-2 leading-relaxed">MI350X 基于 CDNA 4 架构，288GB HBM3e 显存，在推理场景中展现强劲竞争力。</p>
+          </article>
+          <!-- 列表-芯片3 -->
+          <article class="py-5 border-b border-outline-variant/15 group cursor-pointer">
+            <h3 class="font-display font-bold text-base text-on-surface group-hover:text-primary transition-colors leading-snug">华为昇腾 910C 量产：国产 AI 芯片迈入新阶段</h3>
+            <div class="flex items-center gap-3 mt-2.5 text-xs text-on-surface-variant">
+              <span>华为</span>
+              <span class="w-0.5 h-0.5 rounded-full bg-on-surface-variant/40"></span>
+              <span>2025-06-03</span>
+            </div>
+            <p class="text-sm text-on-surface-variant mt-2 leading-relaxed">昇腾 910C 在 FP16 算力上达到 320 TFLOPS，国产替代方案日趋成熟。</p>
+          </article>
+        </div>
 
+        <!-- 机器人分类资讯 -->
+        <div id="panel-robot" class="category-panel hidden grid grid-cols-2 gap-x-12 gap-y-0">
+          <!-- 列表-机器人1 -->
+          <article class="py-5 border-b border-outline-variant/15 group cursor-pointer">
+            <h3 class="font-display font-bold text-base text-on-surface group-hover:text-primary transition-colors leading-snug">Figure 02 发布：人形机器人进入量产准备期</h3>
+            <div class="flex items-center gap-3 mt-2.5 text-xs text-on-surface-variant">
+              <span>Figure AI</span>
+              <span class="w-0.5 h-0.5 rounded-full bg-on-surface-variant/40"></span>
+              <span>2025-06-12</span>
+            </div>
+            <p class="text-sm text-on-surface-variant mt-2 leading-relaxed">Figure 02 搭载 OpenAI 多模态模型，具备自主决策和灵巧操作能力，计划 2026 年量产。</p>
+          </article>
+          <!-- 列表-机器人2 -->
+          <article class="py-5 border-b border-outline-variant/15 group cursor-pointer">
+            <h3 class="font-display font-bold text-base text-on-surface group-hover:text-primary transition-colors leading-snug">Tesla Optimus 最新进展：工厂场景落地加速</h3>
+            <div class="flex items-center gap-3 mt-2.5 text-xs text-on-surface-variant">
+              <span>Tesla</span>
+              <span class="w-0.5 h-0.5 rounded-full bg-on-surface-variant/40"></span>
+              <span>2025-06-04</span>
+            </div>
+            <p class="text-sm text-on-surface-variant mt-2 leading-relaxed">Optimus 已在特斯拉超级工厂执行电池搬运和质检任务，马斯克称年内将部署千台以上。</p>
+          </article>
+        </div>
+
+        <!-- 开源分类资讯 -->
+        <div id="panel-opensource" class="category-panel hidden grid grid-cols-2 gap-x-12 gap-y-0">
+          <!-- 列表-开源1 -->
+          <article class="py-5 border-b border-outline-variant/15 group cursor-pointer">
+            <h3 class="font-display font-bold text-base text-on-surface group-hover:text-primary transition-colors leading-snug">Hugging Face 推出开源模型评估框架 Open LLM Leaderboard v2</h3>
+            <div class="flex items-center gap-3 mt-2.5 text-xs text-on-surface-variant">
+              <span>Hugging Face</span>
+              <span class="w-0.5 h-0.5 rounded-full bg-on-surface-variant/40"></span>
+              <span>2025-06-10</span>
+            </div>
+            <p class="text-sm text-on-surface-variant mt-2 leading-relaxed">新版排行榜引入更全面的评估维度，包括推理、代码、多语言等，成为开源模型的事实标准。</p>
+          </article>
+          <!-- 列表-开源2 -->
+          <article class="py-5 border-b border-outline-variant/15 group cursor-pointer">
+            <h3 class="font-display font-bold text-base text-on-surface group-hover:text-primary transition-colors leading-snug">Llama 4 开源发布：Meta 继续推动 AI 民主化</h3>
+            <div class="flex items-center gap-3 mt-2.5 text-xs text-on-surface-variant">
+              <span>Meta AI</span>
+              <span class="w-0.5 h-0.5 rounded-full bg-on-surface-variant/40"></span>
+              <span>2025-06-05</span>
+            </div>
+            <p class="text-sm text-on-surface-variant mt-2 leading-relaxed">Llama 4 全系列模型权重在 Hugging Face 开放下载，商用许可条件进一步放宽。</p>
+          </article>
+        </div>
+
+        <!-- 政策分类资讯 -->
+        <div id="panel-policy" class="category-panel hidden grid grid-cols-2 gap-x-12 gap-y-0">
+          <!-- 列表-政策1 -->
+          <article class="py-5 border-b border-outline-variant/15 group cursor-pointer">
+            <h3 class="font-display font-bold text-base text-on-surface group-hover:text-primary transition-colors leading-snug">EU AI Act 正式执行：全球首部全面 AI 监管法规落地</h3>
+            <div class="flex items-center gap-3 mt-2.5 text-xs text-on-surface-variant">
+              <span>欧盟委员会</span>
+              <span class="w-0.5 h-0.5 rounded-full bg-on-surface-variant/40"></span>
+              <span>2025-06-11</span>
+            </div>
+            <p class="text-sm text-on-surface-variant mt-2 leading-relaxed">高风险 AI 系统必须通过合规审查，通用模型需披露训练数据和版权信息，违规罚款最高年营收 7%。</p>
+          </article>
+          <!-- 列表-政策2 -->
+          <article class="py-5 border-b border-outline-variant/15 group cursor-pointer">
+            <h3 class="font-display font-bold text-base text-on-surface group-hover:text-primary transition-colors leading-snug">中国发布 AI 生成内容标识新规：深度合成须加水印</h3>
+            <div class="flex items-center gap-3 mt-2.5 text-xs text-on-surface-variant">
+              <span>国家网信办</span>
+              <span class="w-0.5 h-0.5 rounded-full bg-on-surface-variant/40"></span>
+              <span>2025-06-01</span>
+            </div>
+            <p class="text-sm text-on-surface-variant mt-2 leading-relaxed">新规要求所有 AI 生成的文本、图像和视频必须添加不可篡改的数字水印标识，8 月 1 日起实施。</p>
+          </article>
+        </div>
+
+      </div>
     </div>
 
   </main>
   <!-- @main-content:end -->
 
   <script>
-    $(function() {
-
-      // ===== 日报/周报 Tab 切换 =====
-      $('#tab-daily').on('click', function() {
-        // 切换Tab激活态
-        $(this).addClass('bg-surface text-on-surface shadow-sm');
-        $(this).removeClass('text-on-surface-variant');
-        $('#tab-weekly').removeClass('bg-surface text-on-surface shadow-sm');
-        $('#tab-weekly').addClass('text-on-surface-variant');
-        // 切换内容
-        $('#daily-content').removeClass('hidden');
-        $('#weekly-content').addClass('hidden');
-        // 切换标题
-        $('#page-title-daily').removeClass('hidden');
-        $('#page-title-weekly').addClass('hidden');
-        // 重置分类筛选到"全部"
-        resetCategoryToAll();
-      });
-
-      $('#tab-weekly').on('click', function() {
-        // 切换Tab激活态
-        $(this).addClass('bg-surface text-on-surface shadow-sm');
-        $(this).removeClass('text-on-surface-variant');
-        $('#tab-daily').removeClass('bg-surface text-on-surface shadow-sm');
-        $('#tab-daily').addClass('text-on-surface-variant');
-        // 切换内容
-        $('#weekly-content').removeClass('hidden');
-        $('#daily-content').addClass('hidden');
-        // 切换标题
-        $('#page-title-weekly').removeClass('hidden');
-        $('#page-title-daily').addClass('hidden');
-        // 重置分类筛选到"全部"
-        resetCategoryToAll();
-      });
-
-      // ===== 分类标签筛选 =====
-      var categoryMap = {
-        'cat-all': 'all',
-        'cat-model': 'model',
-        'cat-opensource': 'opensource',
-        'cat-product': 'product',
-        'cat-policy': 'policy',
-        'cat-research': 'research',
-        'cat-agent': 'agent'
-      };
-
-      function resetCategoryToAll() {
-        // 重置所有分类标签样式
-        $('.category-tag').removeClass('bg-primary text-on-primary');
-        $('.category-tag').addClass('bg-surface-container text-on-surface-variant');
-        $('#cat-all').addClass('bg-primary text-on-primary');
-        $('#cat-all').removeClass('bg-surface-container text-on-surface-variant');
-        // 显示所有分类
-        $('.news-category').show();
-      }
-
-      $('.category-tag').on('click', function() {
-        var clickedId = $(this).attr('id');
-        var category = categoryMap[clickedId];
+    $(function () {
+      // 分类标签切换
+      $('#category-tabs').on('click', '.category-tab', function () {
+        var $tab = $(this);
+        var tabId = $tab.attr('id');
+        var category = tabId.replace('tab-', '');
 
         // 更新标签激活态
-        $('.category-tag').removeClass('bg-primary text-on-primary');
-        $('.category-tag').addClass('bg-surface-container text-on-surface-variant');
-        $(this).removeClass('bg-surface-container text-on-surface-variant');
-        $(this).addClass('bg-primary text-on-primary');
+        $('.category-tab').removeClass('bg-primary text-on-primary').addClass('bg-surface-container text-on-surface-variant');
+        $tab.removeClass('bg-surface-container text-on-surface-variant').addClass('bg-primary text-on-primary');
 
-        // 获取当前可见的内容区（日报或周报）
-        var $currentContent = $('#daily-content').is(':visible') ? $('#daily-content') : $('#weekly-content');
-
-        if (category === 'all') {
-          // 显示所有分类
-          $currentContent.find('.news-category').show();
-        } else {
-          // 显示匹配分类，隐藏其他
-          $currentContent.find('.news-category').each(function() {
-            if ($(this).data('category') === category) {
-              $(this).show();
-            } else {
-              $(this).hide();
-            }
-          });
-        }
+        // 隐藏所有面板
+        $('.category-panel').stop().fadeOut(200, function () {
+          // 显示目标面板（带淡入效果）
+          $('#panel-' + category).stop().fadeIn(300);
+        });
       });
-
-      // ===== 往期日报链接 =====
-      // 点击往期日期 - 应实现：
-      // 1. 调用后端API获取对应日期的日报数据
-      // 2. 替换当前页面新闻内容为历史数据
-      // 3. 更新页面标题为对应日期
-      $('#past-0708, #past-0707, #past-0706, #past-0705, #past-0704').on('click', function(e) {
-        e.preventDefault();
-        console.log('需要调用后端API加载对应日期的日报数据:', $(this).attr('id'));
-      });
-
-      // ===== 热门话题链接 =====
-      // 点击热门话题 - 应实现：
-      // 1. 根据话题关键词搜索相关新闻
-      // 2. 筛选并展示包含该关键词的新闻卡片
-      // 3. 更新分类标签为对应分类
-      $('#topic-gpt5, #topic-claude-agent, #topic-gemma3, #topic-ai-regulation, #topic-cursor').on('click', function(e) {
-        e.preventDefault();
-        console.log('需要搜索相关话题新闻:', $(this).text().trim());
-      });
-
     });
   </script>
 
