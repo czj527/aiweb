@@ -7,14 +7,6 @@
       },
       "title": "首页",
       "size": "web"
-    },
-    {
-      "type": "html",
-      "options": {
-        "path": ".cozeproj/prototype/web/daily.html"
-      },
-      "title": "日报",
-      "size": "web"
     }
   ]
 }
