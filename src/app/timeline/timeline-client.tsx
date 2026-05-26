@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { Clock } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Clock, ChevronLeft, ChevronRight } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -38,11 +38,11 @@ const CATEGORY_NAMES: Record<string, string> = {
 };
 
 const LINE_HEIGHTS: Record<number, number> = {
-  5: 160,
-  4: 120,
-  3: 80,
-  2: 50,
-  1: 30,
+  5: 140,
+  4: 105,
+  3: 70,
+  2: 45,
+  1: 25,
 };
 
 const DOT_SIZES: Record<number, number> = {
@@ -53,24 +53,20 @@ const DOT_SIZES: Record<number, number> = {
   1: 6,
 };
 
-const YEAR_WIDTH = 600;
-const START_YEAR = 1920;
-const START_POS = 40;
-const MAIN_LINE_TOP = 80; // 主线靠近顶部，事件往下展开
+const AVAILABLE_YEARS = [2022, 2023, 2024, 2025, 2026];
+const MAIN_LINE_TOP = 200; // 主线 y 位置（给上方竖线留空间）
+const MONTH_WIDTH = 80; // 每月宽度
+const TOTAL_WIDTH = 60 + 12 * MONTH_WIDTH + 60; // 左右留白 + 12个月
 
 // ─── Component ──────────────────────────────────────────────────────
 
 export function TimelineClient({ initialMilestones }: { initialMilestones: Milestone[] }) {
   const [milestones, setMilestones] = useState<Milestone[]>(initialMilestones);
+  const [currentYear, setCurrentYear] = useState(2022);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedImportance, setSelectedImportance] = useState<string>('all');
-  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
-  const [hasScrolled, setHasScrolled] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const isDragging = useRef(false);
-  const startX = useRef(0);
-  const scrollLeft = useRef(0);
-  const hasInitialized = useRef(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [isAnimating, setIsAnimating] = useState(false);
 
   // 如果初始数据为空，从 API 获取
   useEffect(() => {
@@ -84,111 +80,57 @@ export function TimelineClient({ initialMilestones }: { initialMilestones: Miles
     }
   }, [initialMilestones]);
 
-  // 初始滚动到 2017 位置
-  useEffect(() => {
-    if (hasInitialized.current) return;
-    if (milestones.length === 0) return;
-    
-    const targetYear = 2017;
-    const targetPos = START_POS + (targetYear - START_YEAR) * YEAR_WIDTH;
-    const containerWidth = containerRef.current?.clientWidth || 1200;
-    const scrollToPos = Math.max(0, targetPos - containerWidth / 2);
-    
-    const timer = setTimeout(() => {
-      if (containerRef.current) {
-        containerRef.current.scrollLeft = scrollToPos;
-        hasInitialized.current = true;
-        setHasScrolled(true);
-      }
-    }, 100);
-    
-    return () => clearTimeout(timer);
-  }, [milestones]);
-
-  // 计算事件位置
-  const getEventPosition = (dateStr: string) => {
-    const [year, month] = dateStr.split('-').map(Number);
-    return START_POS + (year - START_YEAR) * YEAR_WIDTH + (month / 12) * YEAR_WIDTH;
+  // 计算事件的 x 位置（基于月份和日期）
+  const getEventX = (dateStr: string) => {
+    const parts = dateStr.split('-');
+    if (parts.length < 2) return 60 + 6 * MONTH_WIDTH;
+    const month = parseInt(parts[1], 10);
+    const day = parts.length >= 3 ? parseInt(parts[2], 10) : 15;
+    return 60 + (month - 1) * MONTH_WIDTH + ((day || 15) / 30) * MONTH_WIDTH;
   };
 
   // 格式化日期显示
-  const formatDate = (dateStr: string, importance: number) => {
-    const [year, month, day] = dateStr.split('-').map(Number);
-    if (importance >= 5 && day) {
-      return `${year}.${month}.${day}`;
-    } else if (importance >= 3 && month) {
-      return `${year}.${month}`;
-    }
-    return String(year);
+  const formatDate = (dateStr: string) => {
+    const parts = dateStr.split('-');
+    if (parts.length < 2) return dateStr;
+    return `${parseInt(parts[0], 10)}.${parseInt(parts[1], 10)}${parts.length >= 3 && parts[2] ? `.${parseInt(parts[2], 10)}` : ''}`;
   };
 
-  // 筛选事件
-  const filteredMilestones = milestones.filter(m => {
+  // 筛选当前年份的事件
+  const yearMilestones = milestones.filter(m => {
+    const year = new Date(m.date).getFullYear();
+    if (year !== currentYear) return false;
     if (selectedCategory !== 'all' && m.category !== selectedCategory) return false;
     if (selectedImportance !== 'all' && m.importance !== parseInt(selectedImportance)) return false;
     return true;
   });
 
-  // 拖拽滚动
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest('.event-card')) return;
-    isDragging.current = true;
-    startX.current = e.pageX - (containerRef.current?.offsetLeft || 0);
-    scrollLeft.current = containerRef.current?.scrollLeft || 0;
-    if (containerRef.current) containerRef.current.style.cursor = 'grabbing';
+  // 年份切换
+  const goToYear = (year: number) => {
+    if (year === currentYear) return;
+    setIsAnimating(true);
+    setExpandedId(null);
+    setTimeout(() => {
+      setCurrentYear(year);
+      setIsAnimating(false);
+    }, 150);
   };
 
-  const handleMouseUp = () => {
-    isDragging.current = false;
-    if (containerRef.current) containerRef.current.style.cursor = 'default';
+  const prevYear = () => {
+    const idx = AVAILABLE_YEARS.indexOf(currentYear);
+    if (idx > 0) goToYear(AVAILABLE_YEARS[idx - 1]);
   };
 
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging.current) return;
-    e.preventDefault();
-    const x = e.pageX - (containerRef.current?.offsetLeft || 0);
-    const walk = (x - startX.current) * 1.5;
-    if (containerRef.current) {
-      containerRef.current.scrollLeft = scrollLeft.current - walk;
-    }
+  const nextYear = () => {
+    const idx = AVAILABLE_YEARS.indexOf(currentYear);
+    if (idx < AVAILABLE_YEARS.length - 1) goToYear(AVAILABLE_YEARS[idx + 1]);
   };
-
-  // 滚轮横向滚动
-  const handleWheel = (e: React.WheelEvent) => {
-    if (Math.abs(e.deltaY) > Math.abs(e.deltaX) && containerRef.current) {
-      e.preventDefault();
-      containerRef.current.scrollLeft += e.deltaY;
-    }
-  };
-
-  // 滚动检测
-  const handleScroll = () => {
-    if (containerRef.current && containerRef.current.scrollLeft > 100 && !hasScrolled) {
-      setHasScrolled(true);
-    }
-  };
-
-  // 切换卡片展开/收起
-  const toggleCard = (id: string) => {
-    setExpandedCards(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  };
-
-  // 总宽度
-  const totalWidth = (2026 - START_YEAR + 1) * YEAR_WIDTH + 80;
 
   return (
     <div className="min-h-screen bg-background font-sans">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border/30 px-4 sm:px-6 py-6">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-5xl mx-auto">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-5">
             {/* 标题 */}
             <div className="flex items-center gap-3">
@@ -197,7 +139,7 @@ export function TimelineClient({ initialMilestones }: { initialMilestones: Miles
               </div>
               <div>
                 <h1 className="text-2xl sm:text-3xl font-bold font-display text-foreground">AI 发展时间线</h1>
-                <p className="text-sm text-muted-foreground">从 1920 年至今的 AI 演进历程</p>
+                <p className="text-sm text-muted-foreground">从 2022 年至今的 AI 演进历程</p>
               </div>
             </div>
 
@@ -230,8 +172,41 @@ export function TimelineClient({ initialMilestones }: { initialMilestones: Miles
             </div>
           </div>
 
+          {/* 年份选择器 */}
+          <div className="flex items-center justify-center gap-1 mb-4">
+            <button
+              onClick={prevYear}
+              disabled={currentYear <= AVAILABLE_YEARS[0]}
+              className="p-2 rounded-lg hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              aria-label="上一年"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            {AVAILABLE_YEARS.map(year => (
+              <button
+                key={year}
+                onClick={() => goToYear(year)}
+                className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-all ${
+                  currentYear === year
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'hover:bg-accent text-muted-foreground'
+                }`}
+              >
+                {year}
+              </button>
+            ))}
+            <button
+              onClick={nextYear}
+              disabled={currentYear >= AVAILABLE_YEARS[AVAILABLE_YEARS.length - 1]}
+              className="p-2 rounded-lg hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              aria-label="下一年"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
+
           {/* 筛选器 */}
-          <div className="flex flex-wrap gap-2 items-center">
+          <div className="flex flex-wrap gap-2 items-center justify-center">
             <div className="flex items-center gap-1.5">
               <span className="text-xs text-muted-foreground">类型:</span>
               {['all', 'breakthrough', 'model', 'product', 'opensource', 'event', 'regulation'].map(cat => (
@@ -276,177 +251,122 @@ export function TimelineClient({ initialMilestones }: { initialMilestones: Miles
         </div>
       </header>
 
-      {/* 时间线容器 */}
-      <div
-        ref={containerRef}
-        className="overflow-x-auto overflow-y-visible cursor-grab active:cursor-grabbing scrollbar-thin scrollbar-thumb-[#c9ada7] scrollbar-track-[#e5e5e5]"
-        style={{ scrollbarWidth: 'thin', scrollbarColor: '#c9ada7 #e5e5e5' }}
-        onMouseDown={handleMouseDown}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        onMouseMove={handleMouseMove}
-        onWheel={handleWheel}
-        onScroll={handleScroll}
-      >
+      {/* 时间线区域 */}
+      <div className="max-w-5xl mx-auto px-4 py-8">
         <div
-          className="relative"
-          style={{ width: `${totalWidth}px`, minHeight: '500px' }}
+          className={`relative transition-opacity duration-150 ${isAnimating ? 'opacity-0' : 'opacity-100'}`}
+          style={{ width: `${TOTAL_WIDTH}px`, minHeight: '500px', margin: '0 auto' }}
         >
-          {/* 时间轴主线 - 靠近顶部 */}
+          {/* 主线 */}
           <div
-            className="absolute left-0 right-0 h-0.5 bg-[#d1d5db] rounded"
-            style={{ top: `${MAIN_LINE_TOP}px` }}
+            className="absolute left-0 right-0 h-0.5 bg-border rounded"
+            style={{ top: MAIN_LINE_TOP }}
           />
 
-          {/* 年份标记 - 在主线上方 */}
-          <div className="absolute left-0 right-0 flex justify-between" style={{ top: `${MAIN_LINE_TOP - 25}px` }}>
-            {[1920, 1930, 1940, 1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020, 2026].map(year => (
+          {/* 月份标记 - 在主线下方 */}
+          <div className="absolute left-0 right-0 flex" style={{ top: MAIN_LINE_TOP + 15 }}>
+            {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
               <div
-                key={year}
-                className="relative font-display text-sm font-bold text-muted-foreground"
-                style={{ transform: 'translateX(-50%)' }}
+                key={month}
+                style={{ width: MONTH_WIDTH, textAlign: 'center' }}
+                className="text-xs text-muted-foreground"
               >
-                {year}
-                <div
-                  className="absolute w-0.5 h-3 bg-[#d1d5db]"
-                  style={{ top: '18px', left: '50%' }}
-                />
+                {month}月
               </div>
             ))}
           </div>
 
-          {/* 事件组 - 全部在主线下方 */}
-          {filteredMilestones.map((milestone, index) => {
-            const xPos = getEventPosition(milestone.date);
+          {/* 事件 */}
+          {yearMilestones.map((milestone) => {
+            const x = getEventX(milestone.date);
             const color = CATEGORY_COLORS[milestone.category];
-            const lineHeight = LINE_HEIGHTS[milestone.importance] || 80;
+            const lineHeight = LINE_HEIGHTS[milestone.importance] || 70;
             const dotSize = DOT_SIZES[milestone.importance] || 10;
-            const isExpanded = expandedCards.has(milestone.id);
+            const isExpanded = expandedId === milestone.id;
 
             return (
               <div
                 key={milestone.id}
-                className="absolute event-card cursor-pointer"
-                style={{
-                  left: `${xPos}px`,
-                  top: `${MAIN_LINE_TOP}px`,
-                  transform: 'translateX(-50%)',
-                  opacity: 0,
-                  animation: `fadeSlideDown 0.4s ease forwards`,
-                  animationDelay: `${Math.min(index * 30, 500)}ms`,
-                }}
-                onClick={() => toggleCard(milestone.id)}
+                className="absolute cursor-pointer group"
+                style={{ left: `${x}px`, transform: 'translateX(-50%)' }}
+                onClick={() => setExpandedId(isExpanded ? null : milestone.id)}
               >
-                {/* 竖线：从主线向下延伸 */}
+                {/* 竖线：从主线上方延伸 */}
                 <div
-                  className="absolute left-1/2 -translate-x-1/2 w-0.5 bg-current transition-all duration-300"
+                  className="absolute left-1/2 -translate-x-1/2 w-0.5 bg-current"
                   style={{
-                    top: 0,
+                    bottom: MAIN_LINE_TOP,
                     height: `${lineHeight}px`,
+                    color: color,
                   }}
                 />
 
-                {/* 圆点：在竖线底端 */}
+                {/* 圆点：竖线顶端 */}
                 <div
-                  className="absolute left-1/2 -translate-x-1/2 rounded-full transition-transform duration-200 hover:scale-130"
+                  className="absolute left-1/2 -translate-x-1/2 rounded-full transition-transform duration-200 group-hover:scale-125"
                   style={{
-                    top: `${lineHeight - dotSize / 2}px`,
-                    width: `${dotSize}px`,
-                    height: `${dotSize}px`,
-                    backgroundColor: 'currentColor',
+                    bottom: `${MAIN_LINE_TOP + lineHeight - dotSize / 2}px`,
+                    width: dotSize,
+                    height: dotSize,
+                    backgroundColor: color,
                   }}
                 />
 
-                {/* 日期标签：在圆点下方 */}
+                {/* hover tooltip：日期+标题 */}
                 <div
-                  className={`absolute left-1/2 -translate-x-1/2 text-center whitespace-nowrap pointer-events-none ${
-                    milestone.importance >= 5
-                      ? 'text-[11px] font-bold opacity-90'
-                      : milestone.importance >= 4
-                      ? 'text-[10px] font-semibold'
-                      : milestone.importance >= 3
-                      ? 'text-[9px]'
-                      : 'text-[8px] opacity-70'
-                  }`}
-                  style={{ top: `${lineHeight + 8}px`, color: 'inherit' }}
+                  className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity text-xs z-20"
+                  style={{ bottom: `${MAIN_LINE_TOP + lineHeight + 8}px` }}
                 >
-                  {formatDate(milestone.date, milestone.importance)}
-                </div>
-
-                {/* 标题：在日期下方 */}
-                <div
-                  className={`absolute left-1/2 -translate-x-1/2 text-center whitespace-nowrap pointer-events-none ${
-                    milestone.importance >= 5
-                      ? 'text-[10px] font-semibold'
-                      : 'text-[9px] opacity-75'
-                  }`}
-                  style={{ top: `${lineHeight + 22}px`, color: 'inherit' }}
-                >
-                  {milestone.title.length > 15 ? milestone.title.slice(0, 15) + '...' : milestone.title}
-                </div>
-
-                {/* 展开卡片：在标题下方，点击展开 */}
-                <div
-                  className={`absolute left-1/2 -translate-x-1/2 bg-card rounded-xl border-l-[3px] shadow-lg p-3.5 min-w-[220px] max-w-[280px] transition-all duration-300 ${
-                    isExpanded ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'
-                  }`}
-                  style={{
-                    top: `${lineHeight + 40}px`,
-                    borderLeftColor: color,
-                  }}
-                >
-                  <div className="text-[11px] font-semibold opacity-70 mb-1.5">
-                    {milestone.date}
-                  </div>
-                  <div className="text-sm font-bold text-foreground mb-1.5 leading-snug">
-                    {milestone.title}
-                  </div>
-                  {milestone.description && (
-                    <div className="text-xs text-muted-foreground mb-2.5 leading-relaxed">
-                      {milestone.description}
-                    </div>
-                  )}
-                  <span
-                    className="inline-block px-2 py-0.5 text-[10px] font-semibold rounded-full"
-                    style={{
-                      backgroundColor: `${color}20`,
-                      color,
-                    }}
-                  >
-                    {CATEGORY_NAMES[milestone.category]}
+                  <span className="bg-popover text-popover-foreground px-2 py-1 rounded shadow-lg border border-border/50">
+                    {formatDate(milestone.date)} {milestone.title}
                   </span>
                 </div>
+
+                {/* 展开详情：在主线下方 */}
+                {isExpanded && (
+                  <div
+                    className="absolute left-1/2 -translate-x-1/2 bg-card rounded-xl border-l-[3px] shadow-lg p-4 min-w-[240px] max-w-[300px] z-10 animate-in fade-in slide-in-from-top-2 duration-200"
+                    style={{ top: `${MAIN_LINE_TOP + 25}px`, borderLeftColor: color }}
+                  >
+                    <div className="text-xs font-semibold opacity-70 mb-1">{milestone.date}</div>
+                    <div className="text-sm font-bold text-foreground mb-1.5 leading-snug">{milestone.title}</div>
+                    {milestone.description && (
+                      <div className="text-xs text-muted-foreground mb-2 leading-relaxed">
+                        {milestone.description.length > 150
+                          ? milestone.description.slice(0, 150) + '...'
+                          : milestone.description}
+                      </div>
+                    )}
+                    <span
+                      className="inline-block px-2 py-0.5 text-[10px] font-semibold rounded-full"
+                      style={{
+                        backgroundColor: `${color}20`,
+                        color,
+                      }}
+                    >
+                      {CATEGORY_NAMES[milestone.category]}
+                    </span>
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
-      </div>
 
-      {/* 滚动提示 */}
-      <div
-        className={`fixed bottom-8 right-8 bg-card px-5 py-3 rounded-full shadow-lg text-sm text-muted-foreground flex items-center gap-2 z-50 transition-opacity ${
-          hasScrolled ? 'opacity-0 pointer-events-none' : 'opacity-100 animate-bounce'
-        }`}
-      >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M5 12h14M12 5l7 7-7 7" />
-        </svg>
-        左右滑动探索时间线
-      </div>
+        {/* 无数据提示 */}
+        {yearMilestones.length === 0 && (
+          <div className="text-center py-20 text-muted-foreground">
+            {currentYear} 年暂无记录的 AI 里程碑事件
+          </div>
+        )}
 
-      {/* 入场动画 */}
-      <style jsx global>{`
-        @keyframes fadeSlideDown {
-          from {
-            opacity: 0;
-            transform: translateX(-50%) translateY(-10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(-50%) translateY(0);
-          }
-        }
-      `}</style>
+        {/* 统计信息 */}
+        {yearMilestones.length > 0 && (
+          <div className="text-center mt-8 text-sm text-muted-foreground">
+            共 {yearMilestones.length} 个里程碑事件
+          </div>
+        )}
+      </div>
     </div>
   );
 }

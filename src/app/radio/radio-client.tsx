@@ -170,23 +170,23 @@ export function RadioClient({ initialBroadcasts }: { initialBroadcasts: RadioBro
   const currentIdx = currentBroadcast ? broadcasts.findIndex(b => b.id === currentBroadcast.id) : -1;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#1a1814] via-[#2a2520] to-[#1a1814]">
+    <div className="min-h-screen bg-background">
       {/* 顶部标题 */}
       <div className="max-w-4xl mx-auto px-4 pt-8 pb-4">
         <div className="flex items-center gap-3 mb-2">
-          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-900/40 to-amber-700/20 border border-amber-700/30 flex items-center justify-center">
-            <Radio className="w-6 h-6 text-amber-400" />
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+            <Radio className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold font-display text-amber-100">AI 电台</h1>
-            <p className="text-sm text-amber-400/60">复古收音机 · AI 资讯语音播报</p>
+            <h1 className="text-2xl sm:text-3xl font-bold font-display text-foreground">AI 电台</h1>
+            <p className="text-sm text-muted-foreground">复古收音机 · AI 资讯语音播报</p>
           </div>
         </div>
       </div>
 
       {/* 播放器区域 */}
       <div className="max-w-4xl mx-auto px-4 py-6">
-        <div className="bg-gradient-to-b from-[#2d2820] to-[#1f1b16] rounded-3xl border border-amber-900/30 shadow-2xl overflow-hidden">
+        <div className="bg-gradient-to-b from-[#2d2820] to-[#1f1b16] rounded-3xl border border-amber-900/20 shadow-2xl shadow-amber-900/10 overflow-hidden">
           {/* 唱片区域 */}
           <div className="flex flex-col items-center py-8 sm:py-12">
             {/* 黑胶唱片 */}
@@ -349,13 +349,13 @@ export function RadioClient({ initialBroadcasts }: { initialBroadcasts: RadioBro
 
         {/* 播客列表 */}
         <div className="mt-8">
-          <h3 className="text-sm font-semibold text-amber-200/60 uppercase tracking-wider mb-4 flex items-center gap-2">
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4 flex items-center gap-2">
             <Radio className="w-4 h-4" />
-            往期节目
+            节目列表
           </h3>
           
           {broadcasts.length === 0 ? (
-            <div className="text-center py-12 text-amber-400/40">
+            <div className="text-center py-12 text-muted-foreground">
               <Radio className="w-10 h-10 mx-auto mb-3 opacity-30" />
               <p className="text-sm">暂无节目</p>
             </div>
@@ -367,19 +367,19 @@ export function RadioClient({ initialBroadcasts }: { initialBroadcasts: RadioBro
                   onClick={() => playBroadcast(broadcast)}
                   className={`w-full text-left p-4 rounded-xl border transition-all duration-300 ${
                     currentBroadcast?.id === broadcast.id
-                      ? 'bg-amber-900/20 border-amber-700/40'
-                      : 'bg-[#1f1b16]/50 border-amber-900/20 hover:bg-amber-900/10 hover:border-amber-800/30'
+                      ? 'bg-primary/5 border-primary/30 shadow-sm'
+                      : 'bg-card border-border/30 hover:border-primary/20 hover:shadow-sm'
                   }`}
                 >
                   <div className="flex items-center gap-4">
                     {/* 播放指示 */}
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-800/40 to-amber-900/40 flex items-center justify-center shrink-0">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                       {currentBroadcast?.id === broadcast.id && isPlaying ? (
                         <div className="flex items-end gap-0.5 h-4">
                           {[1, 2, 3].map(i => (
                             <div
                               key={i}
-                              className="w-1 bg-amber-400 rounded-full animate-wave"
+                              className="w-1 bg-primary rounded-full animate-wave"
                               style={{
                                 height: `${8 + Math.random() * 8}px`,
                                 animationDelay: `${i * 100}ms`,
@@ -388,17 +388,17 @@ export function RadioClient({ initialBroadcasts }: { initialBroadcasts: RadioBro
                           ))}
                         </div>
                       ) : (
-                        <Play className="w-4 h-4 text-amber-400/60" />
+                        <Play className="w-4 h-4 text-primary/60" />
                       )}
                     </div>
 
                     {/* 信息 */}
                     <div className="flex-1 min-w-0">
-                      <h4 className="text-sm font-medium text-amber-100 truncate">
+                      <h4 className="text-sm font-medium text-foreground truncate">
                         {broadcast.title}
                       </h4>
                       {broadcast.description && (
-                        <p className="text-xs text-amber-400/50 truncate mt-0.5">
+                        <p className="text-xs text-muted-foreground truncate mt-0.5">
                           {broadcast.description}
                         </p>
                       )}
@@ -406,12 +406,12 @@ export function RadioClient({ initialBroadcasts }: { initialBroadcasts: RadioBro
 
                     {/* 元信息 */}
                     <div className="text-right shrink-0">
-                      <div className="text-xs text-amber-400/60 flex items-center gap-1">
+                      <div className="text-xs text-muted-foreground flex items-center gap-1">
                         <Calendar className="w-3 h-3" />
                         {formatDate(broadcast.date)}
                       </div>
                       {broadcast.duration && (
-                        <div className="text-xs text-amber-500/40 mt-0.5 flex items-center justify-end gap-1">
+                        <div className="text-xs text-muted-foreground/50 mt-0.5 flex items-center justify-end gap-1">
                           <Clock className="w-3 h-3" />
                           {formatTime(broadcast.duration)}
                         </div>
