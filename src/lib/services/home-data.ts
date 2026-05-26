@@ -1,8 +1,7 @@
-import { getNewsByDateRange } from './db-service';
+import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { fetchJuyaFeed } from './rss-fetch-service';
 import { deduplicateResults, dedupAgainstDatabase, convertJuyaResults } from './processor';
 
-/** 获取上海时区的日期字符串 YYYY-MM-DD */
 function toShanghaiDate(date: Date): string {
   return date.toLocaleString('sv-SE', { timeZone: 'Asia/Shanghai' }).split(' ')[0];
 }
@@ -31,38 +30,48 @@ export interface DayData {
   totalCount: number;
 }
 
-/**
- * 获取首页数据（服务端调用）
- * 优先从 Supabase 查询，失败则降级到橘鸦 RSS
- */
 export async function fetchRecentNews(days: number = 7): Promise<{ days: DayData[]; isFallback: boolean }> {
+  // 优先直连 Supabase
   try {
     const result = await fetchFromDB(days);
     if (result.length > 0) return { days: result, isFallback: false };
-  } catch {
-    console.warn('[HomeData] DB query failed, falling back to RSS');
+  } catch (e) {
+    console.error('[HomeData] DB query failed:', e instanceof Error ? e.message : e);
   }
 
+  // 降级到橘鸦 RSS
   try {
     const result = await fetchFromRSS();
     return { days: result, isFallback: true };
-  } catch {
-    return { days: [], isFallback: true };
+  } catch (e) {
+    console.error('[HomeData] RSS fallback failed:', e instanceof Error ? e.message : e);
   }
+
+  return { days: [], isFallback: false };
 }
 
 async function fetchFromDB(validDays: number): Promise<DayData[]> {
+  const client = getSupabaseClient();
   const now = new Date();
   const todayStr = toShanghaiDate(now);
   const startDate = new Date(now);
   startDate.setDate(startDate.getDate() - validDays + 1);
   const startStr = toShanghaiDate(startDate);
 
-  const newsItems = await getNewsByDateRange(startStr, todayStr);
+  const { data, error } = await client
+    .from('news_items')
+    .select('id, title, summary, source_name, source_url, category, published_at')
+    .gte('published_at', `${startStr}T00:00:00`)
+    .lt('published_at', `${todayStr}T23:59:59`)
+    .order('published_at', { ascending: false })
+    .limit(350);
 
+  if (error) throw new Error(`Supabase query failed: ${error.message}`);
+  if (!data || data.length === 0) return [];
+
+  // 按日期+分类分组
   const byDate = new Map<string, Map<string, HomeNewsItem[]>>();
-
-  for (const item of newsItems) {
+  for (const item of data) {
     const utcDate = new Date(item.published_at);
     const dateKey = toShanghaiDate(utcDate);
     if (!byDate.has(dateKey)) byDate.set(dateKey, new Map());
@@ -121,10 +130,7 @@ async function fetchFromRSS(): Promise<DayData[]> {
 
   const deduped = deduplicateResults(juyaResults);
   let fresh = deduped;
-  try {
-    fresh = await dedupAgainstDatabase(deduped, 72);
-  } catch { /* skip */ }
-
+  try { fresh = await dedupAgainstDatabase(deduped, 72); } catch { /* skip */ }
   const processed = convertJuyaResults(fresh);
 
   const catMap = new Map<string, HomeNewsItem[]>();
@@ -142,9 +148,7 @@ async function fetchFromRSS(): Promise<DayData[]> {
   }
 
   const today = new Date();
-  const monthDay = `${today.getMonth() + 1}月${today.getDate()}日`;
   const dateStr = toShanghaiDate(today);
-
   const categories = Array.from(catMap.entries())
     .map(([category, items]) => ({ category, count: items.length, items }))
     .sort((a, b) => {
@@ -153,5 +157,5 @@ async function fetchFromRSS(): Promise<DayData[]> {
       return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
     });
 
-  return [{ date: dateStr, dateLabel: `今天 · ${monthDay}`, categories, totalCount: categories.reduce((s, c) => s + c.count, 0) }];
+  return [{ date: dateStr, dateLabel: `今天 · ${today.getMonth() + 1}月${today.getDate()}日`, categories, totalCount: categories.reduce((s, c) => s + c.count, 0) }];
 }

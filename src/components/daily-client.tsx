@@ -7,6 +7,7 @@ import {
   ChevronRight,
   ArrowLeft,
   BookOpen,
+  Loader2,
 } from 'lucide-react';
 
 interface DailyReport {
@@ -53,18 +54,14 @@ function renderContent(content: string): string {
       .replace(/<img src="(.*?)" alt="(.*?)"\s*\/?>/g, '<img src="$1" alt="$2" class="max-w-full h-auto rounded-lg my-4 shadow-sm" />')
       .replace(/<img src="(.*?)"\s*\/?>/g, '<img src="$1" class="max-w-full h-auto rounded-lg my-4 shadow-sm" />');
   }
-
-  return content
-    .split('\n')
-    .map((line) => {
-      const trimmed = line.trim();
-      if (!trimmed) return '<br/>';
-      if (trimmed.startsWith('### ')) return `<h3 class="text-lg font-bold font-display text-foreground mt-8 mb-3 tracking-tight">${trimmed.slice(4)}</h3>`;
-      if (trimmed.startsWith('## ')) return `<h2 class="text-xl font-bold font-display text-foreground mt-10 mb-4 tracking-tight border-b border-border/30 pb-3">${trimmed.slice(3)}</h2>`;
-      const withBold = trimmed.replace(/\*\*(.+?)\*\*/g, '<strong class="font-semibold text-foreground">$1</strong>');
-      return `<p class="text-[15px] text-foreground/85 leading-[1.85] mb-3">${withBold}</p>`;
-    })
-    .join('');
+  return content.split('\n').map((line) => {
+    const trimmed = line.trim();
+    if (!trimmed) return '<br/>';
+    if (trimmed.startsWith('### ')) return `<h3 class="text-lg font-bold font-display text-foreground mt-8 mb-3 tracking-tight">${trimmed.slice(4)}</h3>`;
+    if (trimmed.startsWith('## ')) return `<h2 class="text-xl font-bold font-display text-foreground mt-10 mb-4 tracking-tight border-b border-border/30 pb-3">${trimmed.slice(3)}</h2>`;
+    const withBold = trimmed.replace(/\*\*(.+?)\*\*/g, '<strong class="font-semibold text-foreground">$1</strong>');
+    return `<p class="text-[15px] text-foreground/85 leading-[1.85] mb-3">${withBold}</p>`;
+  }).join('');
 }
 
 export function DailyContent({ initialReport, initialArchive, initialDate, highlight }: DailyContentProps) {
@@ -72,7 +69,20 @@ export function DailyContent({ initialReport, initialArchive, initialDate, highl
   const [report, setReport] = useState<DailyReport | null>(initialReport);
   const [archiveList, setArchiveList] = useState<DailyListItem[]>(initialArchive);
   const [selectedDate, setSelectedDate] = useState<string | null>(initialDate);
-  const [loading, setLoading] = useState(false); // 初始数据已SSR预取，不loading
+  // SSR 没拿到数据时，客户端立即 fetch
+  const needClientFetch = !initialReport;
+  const [loading, setLoading] = useState(needClientFetch);
+
+  useEffect(() => {
+    if (initialReport) return;
+    // SSR 失败，客户端 fetch
+    const url = initialDate ? `/api/daily?date=${initialDate}` : '/api/daily';
+    fetch(url).then(r => r.json()).then(json => {
+      if (json.success && json.data) {
+        setReport({ ...json.data, hotTopics: Array.isArray(json.data.hotTopics) ? json.data.hotTopics : [] });
+      }
+    }).catch(console.error).finally(() => setLoading(false));
+  }, [initialReport, initialDate]);
 
   const loadByDate = useCallback(async (date: string) => {
     setLoading(true);
@@ -123,14 +133,6 @@ export function DailyContent({ initialReport, initialArchive, initialDate, highl
   const handleTabChange = (m: ViewMode) => {
     setMode(m);
     if (m === 'archive') loadArchive();
-    else if (!selectedDate) {
-      // 已有初始report，不需要重新加载
-      if (!initialReport) {
-        fetch('/api/daily').then(r => r.json()).then(json => {
-          if (json.success && json.data) setReport({ ...json.data, hotTopics: Array.isArray(json.data.hotTopics) ? json.data.hotTopics : [] });
-        });
-      }
-    }
   };
 
   const formatDate = (dateStr: string) => {
@@ -142,9 +144,9 @@ export function DailyContent({ initialReport, initialArchive, initialDate, highl
   if (loading) {
     return (
       <main className="max-w-5xl mx-auto px-8 py-8">
-        <div className="animate-pulse space-y-6">
-          <div className="h-8 bg-muted rounded w-48" />
-          <div className="h-64 bg-muted rounded" />
+        <div className="flex flex-col items-center justify-center py-32 gap-4">
+          <Loader2 className="w-8 h-8 text-primary animate-spin" />
+          <p className="text-muted-foreground text-sm">正在加载日报...</p>
         </div>
       </main>
     );
@@ -155,20 +157,17 @@ export function DailyContent({ initialReport, initialArchive, initialDate, highl
       <div className="flex items-center justify-between mb-8 border-b border-border/30 pb-6">
         <div className="flex items-center gap-4">
           <Link href="/" className="text-muted-foreground hover:text-foreground transition-colors text-sm">
-            <ArrowLeft className="w-4 h-4 inline mr-1 -mt-0.5" />
-            首页
+            <ArrowLeft className="w-4 h-4 inline mr-1 -mt-0.5" />首页
           </Link>
           <span className="text-border">|</span>
           <span className="text-xs text-muted-foreground font-semibold uppercase tracking-widest">AI 日报</span>
         </div>
         <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
           <button onClick={() => handleTabChange('latest')} className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${mode === 'latest' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
-            <BookOpen className="w-3.5 h-3.5 inline mr-1.5 -mt-0.5" />
-            当期日报
+            <BookOpen className="w-3.5 h-3.5 inline mr-1.5 -mt-0.5" />当期日报
           </button>
           <button onClick={() => handleTabChange('archive')} className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${mode === 'archive' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
-            <Calendar className="w-3.5 h-3.5 inline mr-1.5 -mt-0.5" />
-            往期
+            <Calendar className="w-3.5 h-3.5 inline mr-1.5 -mt-0.5" />往期
           </button>
         </div>
       </div>

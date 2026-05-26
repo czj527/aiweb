@@ -30,8 +30,8 @@ const TABS = [
 type TabKey = typeof TABS[number]['key'];
 
 async function fetchLeaderboard(key: TabKey): Promise<LeaderboardResponse> {
-  const [source, category] = key.replace('datalearner-', '').split('-');
-  const res = await fetch(`/api/leaderboard?source=datalearner&category=${category === 'comprehensive' ? 'comprehensive' : category}`);
+  const category = key.replace('datalearner-', '');
+  const res = await fetch(`/api/leaderboard?source=datalearner&category=${category}`);
   if (!res.ok) throw new Error('Failed to fetch leaderboard');
   return res.json();
 }
@@ -91,15 +91,8 @@ export default function LeaderboardPage() {
       <div className="border-b border-border mb-6 overflow-x-auto">
         <div className="flex gap-1 min-w-max">
           {TABS.map(tab => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                activeTab === tab.key
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
-              }`}
-            >
+            <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === tab.key ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'}`}>
               {tab.label}
             </button>
           ))}
@@ -109,9 +102,7 @@ export default function LeaderboardPage() {
       {data && (
         <div className="flex items-center justify-between text-xs text-muted-foreground mb-4 px-1">
           <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1 bg-muted px-2 py-0.5 rounded-md font-medium text-foreground">
-              {activeTabConfig.metric}
-            </span>
+            <span className="inline-flex items-center gap-1 bg-muted px-2 py-0.5 rounded-md font-medium text-foreground">{activeTabConfig.metric}</span>
             <span>共 {data.rankings.length} 个模型</span>
             {data.fetchedAt && <span>· 更新于 {new Date(data.fetchedAt).toLocaleDateString('zh-CN')}</span>}
           </div>
@@ -155,18 +146,12 @@ export default function LeaderboardPage() {
                 {data.rankings.map((entry) => {
                   const percent = getScorePercent(entry.score, data.rankings);
                   const isTop3 = entry.rankPosition <= 3;
-                  const rankBadgeColors = [
-                    'bg-amber-500 text-white',
-                    'bg-slate-400 text-white',
-                    'bg-amber-700 text-white',
-                  ];
+                  const rankBadgeColors = ['bg-amber-500 text-white', 'bg-slate-400 text-white', 'bg-amber-700 text-white'];
                   return (
                     <tr key={entry.id} className={`border-b border-border last:border-b-0 transition-colors hover:bg-muted/20 ${isTop3 ? 'bg-primary/5' : ''}`}>
                       <td className="py-3 px-4">
                         {isTop3 ? (
-                          <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold ${rankBadgeColors[entry.rankPosition - 1]}`}>
-                            {entry.rankPosition}
-                          </span>
+                          <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold ${rankBadgeColors[entry.rankPosition - 1]}`}>{entry.rankPosition}</span>
                         ) : (
                           <span className="text-muted-foreground text-sm font-medium pl-2">{entry.rankPosition}</span>
                         )}
@@ -178,9 +163,7 @@ export default function LeaderboardPage() {
                         </div>
                       </td>
                       <td className="py-3 px-4 text-sm text-muted-foreground">{entry.developer || '—'}</td>
-                      <td className="py-3 px-4">
-                        <span className={`font-bold text-sm ${isTop3 ? 'text-primary' : 'text-foreground'}`}>{entry.score}</span>
-                      </td>
+                      <td className="py-3 px-4"><span className={`font-bold text-sm ${isTop3 ? 'text-primary' : 'text-foreground'}`}>{entry.score}</span></td>
                       <td className="py-3 px-4">
                         <div className="w-full bg-muted rounded-full h-2">
                           <div className={`h-2 rounded-full transition-all duration-500 ${isTop3 ? 'bg-primary' : 'bg-primary/40'}`} style={{ width: `${Math.max(percent, 3)}%` }} />
@@ -205,8 +188,8 @@ export default function LeaderboardPage() {
 
       <div className="mt-8 px-1">
         <div className="bg-muted/30 rounded-lg p-4 text-xs text-muted-foreground space-y-1.5">
-          <p>排行榜数据来源于第三方评测平台，仅供参考。不同评测基准衡量不同能力维度，建议结合实际使用场景选择模型。</p>
-          <p>AA 智能指数汇总编程、数学、推理等10项标准化评测；LMArena 基于全球用户匿名盲测 A/B 投票；综合评测展示 HLE/ARC-AGI-2/FrontierMath/SWE-bench 多维得分。</p>
+          <p>排行榜数据来源于第三方评测平台，仅供参考。</p>
+          <p>AA 智能指数汇总编程、数学、推理等10项标准化评测；LMArena 基于全球用户匿名盲测 A/B 投票。</p>
         </div>
       </div>
     </main>
