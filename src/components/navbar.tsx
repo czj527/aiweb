@@ -19,7 +19,6 @@ const links: NavLink[] = [
   { href: '/leaderboard', label: '排行榜', group: 'main' },
   { href: '/tools', label: '工具', group: 'main' },
   { href: '/timeline', label: '时间线', group: 'main' },
-  { href: '/timeline', label: '时间线', group: 'main' },
   { href: '/admin/workspace', label: '管理', className: 'text-muted-foreground/60 text-xs', group: 'secondary' },
 ];
 

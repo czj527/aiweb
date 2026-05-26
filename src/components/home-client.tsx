@@ -114,7 +114,7 @@ export function HomeClient({ days: initialDays }: HomeClientProps) {
           return (
             <section
               key={day.date}
-              className={`bg-card rounded-xl shadow-card card-hover animate-stagger-fade stagger-${Math.min(dayIndex + 1, 8)}`}
+              className={`bg-card rounded-2xl shadow-card card-hover animate-stagger-fade stagger-${Math.min(dayIndex + 1, 8)}`}
             >
               <div className="px-6 pt-5 pb-3 flex items-center justify-between">
                 <h2 className="font-display font-bold text-lg text-card-foreground">{day.dateLabel}</h2>
@@ -122,19 +122,14 @@ export function HomeClient({ days: initialDays }: HomeClientProps) {
               </div>
               {day.categories.length > 0 && (
                 <div className="px-6 pb-3">
-                  <div className="flex gap-2 flex-wrap">
+                  <div className="flex gap-2">
                     {day.categories.map((cat) => {
                       const isActive = cat.category === activeCategory;
+                      const flexVal = Math.max((cat.count / totalCount) * 10, 1.5);
                       return (
-                        <button
-                          key={cat.category}
-                          onClick={() => handleCategorySwitch(dayIndex, cat.category)}
-                          className={`rounded-full px-4 py-1.5 text-sm text-center transition-all duration-300 ${
-                            isActive
-                              ? 'bg-primary text-primary-foreground font-medium shadow-sm'
-                              : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80'
-                          }`}
-                        >
+                        <button key={cat.category} onClick={() => handleCategorySwitch(dayIndex, cat.category)}
+                          className={`rounded-md px-4 py-2 text-sm text-center transition-all duration-200 ${isActive ? 'bg-primary text-primary-foreground font-medium' : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80'}`}
+                          style={{ flex: flexVal }}>
                           {cat.category}<span className="ml-1 text-xs opacity-60">{cat.count}</span>
                         </button>
                       );
@@ -149,7 +144,7 @@ export function HomeClient({ days: initialDays }: HomeClientProps) {
                       <Link
                         key={item.id}
                         href={`/daily?date=${day.date}&highlight=${encodeURIComponent(item.title)}`}
-                        className="group block border border-border/25 rounded-lg bg-muted/30 px-5 py-4 hover:border-primary/30 hover:bg-muted/50 transition-all duration-300 hover:shadow-float"
+                        className="group block border border-border/25 rounded-xl bg-muted/30 px-5 py-4 hover:border-primary/30 hover:bg-muted/50 transition-all duration-300 hover:shadow-float"
                         style={{ animationDelay: `${itemIdx * 0.04}s` }}
                       >
                         <h3 className="text-base font-medium text-card-foreground group-hover:text-primary transition-colors duration-200">{item.title}</h3>

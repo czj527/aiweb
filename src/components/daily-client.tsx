@@ -186,7 +186,7 @@ export function DailyContent({ initialReport, initialArchive, initialDate, highl
                   href={juyaUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-full text-left block p-5 bg-card rounded-lg border border-border/30 hover:border-primary/30 hover:shadow-sm transition-all opacity-70"
+                  className="w-full text-left block p-5 bg-card rounded-xl border border-border/30 hover:border-primary/30 hover:shadow-sm transition-all opacity-70"
                 >
                   <div className="flex items-center justify-between">
                     <div>
@@ -202,7 +202,7 @@ export function DailyContent({ initialReport, initialArchive, initialDate, highl
                   </div>
                 </a>
               ) : (
-                <button key={item.id} onClick={() => loadByDate(item.reportDate)} className="w-full text-left block p-5 bg-card rounded-lg border border-border/30 hover:border-primary/30 hover:shadow-sm transition-all">
+                <button key={item.id} onClick={() => loadByDate(item.reportDate)} className="w-full text-left block p-5 bg-card rounded-xl border border-border/30 hover:border-primary/30 hover:shadow-sm transition-all">
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="text-sm font-semibold text-foreground">{formatDate(item.reportDate)}</h3>
