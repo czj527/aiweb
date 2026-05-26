@@ -66,9 +66,9 @@ export function WeeklyListClient({ items: initialItems }: WeeklyListClientProps)
   }
 
   return (
-    <main className="max-w-5xl mx-auto px-8 py-8">
+    <main className="max-w-5xl mx-auto px-4 sm:px-8 py-8 page-enter">
       {/* 面包屑 */}
-      <div className="flex items-center gap-4 mb-8 border-b border-border/30 pb-6">
+      <div className="flex items-center gap-4 mb-8 border-b border-border/30 pb-6 animate-stagger-fade">
         <Link href="/" className="text-muted-foreground hover:text-foreground transition-colors text-sm">
           <ArrowLeft className="w-4 h-4 inline mr-1 -mt-0.5" />首页
         </Link>
@@ -79,22 +79,25 @@ export function WeeklyListClient({ items: initialItems }: WeeklyListClientProps)
       </div>
 
       {/* 页面标题 */}
-      <div className="mb-10">
-        <h1 className="text-3xl font-bold font-display tracking-tight">
-          📋 每周深度摘要
-        </h1>
-        <p className="text-muted-foreground text-sm mt-2">
+      <div className="mb-10 animate-stagger-fade stagger-2">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-lg">📋</div>
+          <h1 className="text-2xl sm:text-3xl font-bold font-display tracking-tight">
+            每周深度摘要
+          </h1>
+        </div>
+        <p className="text-muted-foreground text-sm ml-[52px]">
           AI行业一周回顾，由AI Pulse自动生成
         </p>
       </div>
 
       {/* 周报列表 */}
       <div className="space-y-4">
-        {items.map((item) => (
+        {items.map((item, i) => (
           <Link
             key={item.id}
             href={`/weekly/${item.id}`}
-            className="block p-6 bg-card rounded-lg border border-border/30 hover:border-primary/30 hover:shadow-sm transition-all group"
+            className={`block p-6 bg-card rounded-xl border border-border/30 hover:border-primary/30 hover:shadow-float transition-all duration-300 group card-hover animate-stagger-fade stagger-${Math.min(i + 3, 8)}`}
           >
             <div className="flex items-start justify-between">
               <div className="flex-1 min-w-0">

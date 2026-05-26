@@ -56,6 +56,12 @@
   --font-mono:
     ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
     'Courier New', monospace;
+  --animate-stagger-fade: stagger-fade 0.5s ease-out both;
+  --animate-slide-up: slide-up 0.4s ease-out both;
+  --animate-gentle-bounce: gentle-bounce 0.6s ease-out both;
+  --animate-shimmer: shimmer 2s infinite;
+  --animate-pulse-soft: pulse-soft 3s ease-in-out infinite;
+  --animate-float: float 6s ease-in-out infinite;
 }
 
 :root {
@@ -111,4 +117,141 @@
 
 body {
   @apply font-sans;
+}
+
+/* ─── Keyframes ─────────────────────────────────────────────── */
+
+@keyframes stagger-fade {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes gentle-bounce {
+  0% { transform: scale(0.95); opacity: 0; }
+  60% { transform: scale(1.02); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+/* ─── Stagger Delay Utilities ─────────────────────────────── */
+
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.1s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.2s; }
+.stagger-5 { animation-delay: 0.25s; }
+.stagger-6 { animation-delay: 0.3s; }
+.stagger-7 { animation-delay: 0.35s; }
+.stagger-8 { animation-delay: 0.4s; }
+
+/* ─── Shimmer Loading ──────────────────────────────────────── */
+
+.shimmer-loading {
+  background: linear-gradient(90deg, var(--muted) 25%, var(--surface-container-lowest) 50%, var(--muted) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* ─── Page Transition ──────────────────────────────────────── */
+
+.page-enter {
+  animation: slide-up 0.4s ease-out both;
+}
+
+/* ─── Card Hover Enhancement ───────────────────────────────── */
+
+.card-hover {
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+}
+
+/* ─── Navbar Underline Indicator ────────────────────────────── */
+
+.nav-link {
+  position: relative;
+}
+.nav-link::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  width: 0;
+  height: 2px;
+  background: var(--primary);
+  transition: width 0.25s ease, left 0.25s ease;
+  border-radius: 1px;
+}
+.nav-link:hover::after {
+  width: 60%;
+  left: 20%;
+}
+.nav-link-active::after {
+  width: 70%;
+  left: 15%;
+}
+
+/* ─── Scrollbar ────────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+}
+
+/* ─── Selection ────────────────────────────────────────────── */
+
+::selection {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+/* ─── Focus Ring ────────────────────────────────────────────── */
+
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 4px;
 }

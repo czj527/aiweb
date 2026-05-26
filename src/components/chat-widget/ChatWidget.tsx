@@ -287,7 +287,7 @@ export function ChatWidget() {
       {!open && (
         <button
           onClick={() => setOpen(true)}
-          className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 bg-card pl-3.5 pr-4 py-2.5 rounded-full shadow-float hover:shadow-dialog transition-all hover:-translate-y-0.5 border border-border/30 group"
+          className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 bg-card pl-3.5 pr-4 py-2.5 rounded-full shadow-float hover:shadow-dialog transition-all duration-300 hover:-translate-y-1 border border-border/30 group animate-gentle-bounce"
         >
           <MessageCircle className="w-4.5 h-4.5 text-primary flex-shrink-0" />
           <span className="text-sm text-foreground/80 max-w-[200px] truncate group-hover:text-foreground transition-colors">

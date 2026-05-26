@@ -14,7 +14,6 @@ function isRSSData(days: DayData[]): boolean {
 }
 
 function isDataIncomplete(days: DayData[]): boolean {
-  // SSR数据看起来有天数但分类为空，说明ISR缓存了旧渲染
   return days.some(d => d.categories.length === 0);
 }
 
@@ -24,7 +23,6 @@ export function HomeClient({ days: initialDays }: HomeClientProps) {
   const [error, setError] = useState('');
   const [fetched, setFetched] = useState(false);
 
-  // SSR 数据不完整时（空、RSS降级、或ISR缓存了空数据），客户端 fetch API 拿本周完整数据
   useEffect(() => {
     if (fetched) return;
     if (initialDays.length === 0 || isRSSData(initialDays) || isDataIncomplete(initialDays)) {
@@ -87,7 +85,7 @@ export function HomeClient({ days: initialDays }: HomeClientProps) {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex flex-col items-center justify-center py-32 gap-4">
           <p className="text-muted-foreground">加载失败：{error}</p>
-          <button onClick={fetchFromAPI} className="flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm hover:bg-primary/90">
+          <button onClick={fetchFromAPI} className="flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm hover:bg-primary/90 transition-colors">
             <RefreshCw className="w-4 h-4" /> 重新加载
           </button>
         </div>
@@ -106,7 +104,7 @@ export function HomeClient({ days: initialDays }: HomeClientProps) {
   }
 
   return (
-    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 page-enter">
       <div className="flex flex-col gap-8">
         {days.map((day, dayIndex) => {
           const activeCategory = activeCategoryByDay.get(dayIndex) || day.categories[0]?.category || '';
@@ -114,20 +112,29 @@ export function HomeClient({ days: initialDays }: HomeClientProps) {
           const totalCount = day.categories.reduce((sum, c) => sum + c.count, 0);
 
           return (
-            <section key={day.date} className="bg-card rounded-lg shadow-card">
-              <div className="px-6 pt-5 pb-3">
+            <section
+              key={day.date}
+              className={`bg-card rounded-xl shadow-card card-hover animate-stagger-fade stagger-${Math.min(dayIndex + 1, 8)}`}
+            >
+              <div className="px-6 pt-5 pb-3 flex items-center justify-between">
                 <h2 className="font-display font-bold text-lg text-card-foreground">{day.dateLabel}</h2>
+                <span className="text-xs text-muted-foreground">{totalCount} 条资讯</span>
               </div>
               {day.categories.length > 0 && (
                 <div className="px-6 pb-3">
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
                     {day.categories.map((cat) => {
                       const isActive = cat.category === activeCategory;
-                      const flexVal = Math.max((cat.count / totalCount) * 10, 1.5);
                       return (
-                        <button key={cat.category} onClick={() => handleCategorySwitch(dayIndex, cat.category)}
-                          className={`rounded-md px-4 py-2 text-sm text-center transition-all duration-200 ${isActive ? 'bg-primary text-primary-foreground font-medium' : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80'}`}
-                          style={{ flex: flexVal }}>
+                        <button
+                          key={cat.category}
+                          onClick={() => handleCategorySwitch(dayIndex, cat.category)}
+                          className={`rounded-full px-4 py-1.5 text-sm text-center transition-all duration-300 ${
+                            isActive
+                              ? 'bg-primary text-primary-foreground font-medium shadow-sm'
+                              : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80'
+                          }`}
+                        >
                           {cat.category}<span className="ml-1 text-xs opacity-60">{cat.count}</span>
                         </button>
                       );
@@ -138,11 +145,15 @@ export function HomeClient({ days: initialDays }: HomeClientProps) {
               <div className="px-6 pb-5">
                 {activeGroup && activeGroup.items.length > 0 && (
                   <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
-                    {activeGroup.items.map((item) => (
-                      <Link key={item.id} href={`/daily?date=${day.date}&highlight=${encodeURIComponent(item.title)}`}
-                        className="block border border-border/25 rounded-md bg-muted/50 px-5 py-4 hover:border-primary/40 hover:shadow-float transition-all duration-200">
-                        <h3 className="text-base font-medium text-card-foreground">{item.title}</h3>
-                        <p className="text-xs text-muted-foreground mt-2">{item.source}</p>
+                    {activeGroup.items.map((item, itemIdx) => (
+                      <Link
+                        key={item.id}
+                        href={`/daily?date=${day.date}&highlight=${encodeURIComponent(item.title)}`}
+                        className="group block border border-border/25 rounded-lg bg-muted/30 px-5 py-4 hover:border-primary/30 hover:bg-muted/50 transition-all duration-300 hover:shadow-float"
+                        style={{ animationDelay: `${itemIdx * 0.04}s` }}
+                      >
+                        <h3 className="text-base font-medium text-card-foreground group-hover:text-primary transition-colors duration-200">{item.title}</h3>
+                        <p className="text-xs text-muted-foreground/60 mt-1.5">{item.source}</p>
                         <p className="text-sm text-card-foreground/70 mt-2 leading-relaxed line-clamp-2">{item.summary}</p>
                       </Link>
                     ))}

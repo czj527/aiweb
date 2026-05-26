@@ -78,22 +78,26 @@ export default function LeaderboardPage() {
   };
 
   return (
-    <main className="max-w-6xl mx-auto px-6 py-8">
-      <div className="mb-8">
+    <main className="max-w-6xl mx-auto px-6 py-8 page-enter">
+      <div className="mb-8 animate-stagger-fade">
         <div className="flex items-center gap-3 mb-2">
-          <Trophy className="w-7 h-7 text-primary" />
-          <h1 className="text-3xl font-bold text-foreground tracking-tight">大模型排行榜</h1>
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+            <Trophy className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold font-display text-foreground tracking-tight">大模型排行榜</h1>
+            <p className="text-muted-foreground text-sm">
+              数据来源于 <a href="https://www.datalearner.com/leaderboards" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-1">DataLearner<ExternalLink className="w-3 h-3" /></a>
+            </p>
+          </div>
         </div>
-        <p className="text-muted-foreground text-sm ml-10">
-          数据来源于 <a href="https://www.datalearner.com/leaderboards" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-1">DataLearner<ExternalLink className="w-3 h-3" /></a>，聚合主流评测基准的实时排名
-        </p>
       </div>
 
-      <div className="border-b border-border mb-6 overflow-x-auto">
+      <div className="border-b border-border mb-6 overflow-x-auto animate-stagger-fade stagger-2">
         <div className="flex gap-1 min-w-max">
           {TABS.map(tab => (
             <button key={tab.key} onClick={() => setActiveTab(tab.key)}
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === tab.key ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'}`}>
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-all duration-300 whitespace-nowrap ${activeTab === tab.key ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'}`}>
               {tab.label}
             </button>
           ))}
@@ -149,25 +153,25 @@ export default function LeaderboardPage() {
                   const isTop3 = entry.rankPosition <= 3;
                   const rankBadgeColors = ['bg-amber-500 text-white', 'bg-slate-400 text-white', 'bg-amber-700 text-white'];
                   return (
-                    <tr key={entry.id} className={`border-b border-border last:border-b-0 transition-colors hover:bg-muted/20 ${isTop3 ? 'bg-primary/5' : ''}`}>
-                      <td className="py-3 px-4">
+                    <tr key={entry.id} className={`border-b border-border/50 last:border-b-0 transition-colors duration-200 hover:bg-muted/30 ${isTop3 ? 'bg-primary/[0.03]' : ''}`}>
+                      <td className="py-3.5 px-4">
                         {isTop3 ? (
-                          <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold ${rankBadgeColors[entry.rankPosition - 1]}`}>{entry.rankPosition}</span>
+                          <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold shadow-sm ${rankBadgeColors[entry.rankPosition - 1]}`}>{entry.rankPosition}</span>
                         ) : (
                           <span className="text-muted-foreground text-sm font-medium pl-2">{entry.rankPosition}</span>
                         )}
                       </td>
-                      <td className="py-3 px-4">
+                      <td className="py-3.5 px-4">
                         <div>
                           <span className={`font-semibold text-sm ${isTop3 ? 'text-foreground' : 'text-foreground/90'}`}>{entry.modelName}</span>
-                          {entry.description && <p className="text-xs text-muted-foreground mt-0.5">{entry.description}</p>}
+                          {entry.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{entry.description}</p>}
                         </div>
                       </td>
-                      <td className="py-3 px-4 text-sm text-muted-foreground">{entry.developer || '—'}</td>
-                      <td className="py-3 px-4"><span className={`font-bold text-sm ${isTop3 ? 'text-primary' : 'text-foreground'}`}>{entry.score}</span></td>
-                      <td className="py-3 px-4">
-                        <div className="w-full bg-muted rounded-full h-2">
-                          <div className={`h-2 rounded-full transition-all duration-500 ${isTop3 ? 'bg-primary' : 'bg-primary/40'}`} style={{ width: `${Math.max(percent, 3)}%` }} />
+                      <td className="py-3.5 px-4 text-sm text-muted-foreground">{entry.developer || '—'}</td>
+                      <td className="py-3.5 px-4"><span className={`font-bold text-sm tabular-nums ${isTop3 ? 'text-primary' : 'text-foreground'}`}>{entry.score}</span></td>
+                      <td className="py-3.5 px-4">
+                        <div className="w-full bg-muted/50 rounded-full h-2 overflow-hidden">
+                          <div className={`h-full rounded-full transition-all duration-700 ease-out ${isTop3 ? 'bg-primary' : 'bg-primary/30'}`} style={{ width: `${Math.max(percent, 3)}%` }} />
                         </div>
                       </td>
                       <td className="py-3 px-4 text-center"><RankChange change={entry.rankChange} /></td>
