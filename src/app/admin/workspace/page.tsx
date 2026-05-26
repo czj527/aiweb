@@ -390,6 +390,13 @@ export default function AdminWorkspacePage() {
               <Zap className="w-4 h-4" />
               工具管理
             </a>
+            <a
+              href="/admin/milestones"
+              className="flex items-center justify-center gap-2 px-4 py-3 bg-card border border-border rounded-lg text-sm font-medium text-foreground hover:border-primary/40 transition-colors"
+            >
+              <Clock className="w-4 h-4" />
+              里程碑管理
+            </a>
           </div>
         </div>
 
