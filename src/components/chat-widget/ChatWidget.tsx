@@ -7,8 +7,6 @@ import { ChatBubble, ChatMessageData } from './ChatBubble';
 import { ChatInput } from './ChatInput';
 import { QuickActions } from './QuickActions';
 import {
-  matchPublicIntent,
-  matchAdminIntent,
   executePublicIntent,
   executeAdminIntent,
   PublicIntent,
@@ -86,6 +84,68 @@ export function ChatWidget() {
 
   // ── 发送消息 ──
 
+  // ── 快捷操作（走模板API，不走LLM） ──
+
+  const handleQuickAction = useCallback(
+    async (intent: string) => {
+      const intentLabels: Record<string, string> = {
+        'today-news': '今日要闻',
+        'hot-models': '热门模型',
+        tools: 'AI工具',
+        weekly: '本周周报',
+        'sync-juya': '同步资讯',
+        'gen-daily': '生成日报',
+        'gen-weekly': '撰写周报',
+        status: '系统状态',
+      };
+      const label = intentLabels[intent] || intent;
+
+      const userMsg: ChatMessageData = {
+        id: `user-${Date.now()}`,
+        role: 'user',
+        content: label,
+      };
+      const loadingMsg: ChatMessageData = {
+        id: 'loading',
+        role: 'assistant',
+        content: '',
+        loading: true,
+      };
+
+      setMessages((prev) => [...prev, userMsg, loadingMsg]);
+      setLoading(true);
+
+      try {
+        let result: { text: string; link?: string } = { text: '' };
+        if (isAdmin) {
+          result = await executeAdminIntent(intent as AdminIntent);
+        } else {
+          result = await executePublicIntent(intent as PublicIntent);
+        }
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === 'loading'
+              ? { id: `bot-${Date.now()}`, role: 'assistant', content: result.text, link: result.link }
+              : m
+          )
+        );
+      } catch {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === 'loading'
+              ? { id: `bot-${Date.now()}`, role: 'assistant', content: '操作失败，请稍后再试 😅' }
+              : m
+          )
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [isAdmin]
+  );
+
+  // ── 用户输入消息（一律走DeepSeek对话） ──
+
   const sendMessage = useCallback(
     async (text: string) => {
       const userMsg: ChatMessageData = {
@@ -104,38 +164,7 @@ export function ChatWidget() {
       setLoading(true);
 
       try {
-        // 意图匹配
-        if (isAdmin) {
-          const intent = matchAdminIntent(text);
-          if (intent !== 'free-chat') {
-            const result = await executeAdminIntent(intent);
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === 'loading'
-                  ? { id: `bot-${Date.now()}`, role: 'assistant', content: result.text, link: result.link }
-                  : m
-              )
-            );
-            setLoading(false);
-            return;
-          }
-        } else {
-          const intent = matchPublicIntent(text);
-          if (intent !== 'free-chat') {
-            const result = await executePublicIntent(intent);
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === 'loading'
-                  ? { id: `bot-${Date.now()}`, role: 'assistant', content: result.text, link: result.link }
-                  : m
-              )
-            );
-            setLoading(false);
-            return;
-          }
-        }
-
-        // 自由聊天 → DeepSeek API
+        // 用户手动输入 → 一律走DeepSeek API
         const history = messages
           .filter((m) => m.id !== 'welcome' && !m.loading)
           .map((m) => ({
@@ -176,26 +205,6 @@ export function ChatWidget() {
       }
     },
     [isAdmin, messages]
-  );
-
-  // ── 快捷操作 ──
-
-  const handleQuickAction = useCallback(
-    (intent: string) => {
-      // 把快捷操作转为自然语言发出去
-      const intentLabels: Record<string, string> = {
-        'today-news': '今日有什么要闻？',
-        'hot-models': '现在热门模型有哪些？',
-        tools: '推荐一些AI工具',
-        weekly: '本周周报',
-        'sync-juya': '同步今日资讯',
-        'gen-daily': '生成日报',
-        'gen-weekly': '撰写本周周报',
-        status: '查看系统状态',
-      };
-      sendMessage(intentLabels[intent] || intent);
-    },
-    [sendMessage]
   );
 
   // ── 渲染 ──
