@@ -6,10 +6,9 @@ import type { DayData } from '@/lib/services/home-data';
 
 interface HomeClientProps {
   days: DayData[];
-  isFallback: boolean;
 }
 
-export function HomeClient({ days, isFallback }: HomeClientProps) {
+export function HomeClient({ days }: HomeClientProps) {
   const [activeCategoryByDay, setActiveCategoryByDay] = useState<Map<number, string>>(() => {
     const map = new Map<number, string>();
     days.forEach((day, idx) => {
@@ -30,12 +29,6 @@ export function HomeClient({ days, isFallback }: HomeClientProps) {
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {isFallback && (
-        <div className="mb-4 px-4 py-2 rounded-md bg-muted text-muted-foreground text-xs text-center">
-          数据库暂无缓存，当前展示橘鸦RSS实时数据
-        </div>
-      )}
-
       <div className="flex flex-col gap-8">
         {days.map((day, dayIndex) => {
           const activeCategory = activeCategoryByDay.get(dayIndex) || day.categories[0]?.category || '';
@@ -43,10 +36,7 @@ export function HomeClient({ days, isFallback }: HomeClientProps) {
           const totalCount = day.categories.reduce((sum, c) => sum + c.count, 0);
 
           return (
-            <section
-              key={day.date}
-              className="bg-card rounded-lg shadow-card"
-            >
+            <section key={day.date} className="bg-card rounded-lg shadow-card">
               <div className="px-6 pt-5 pb-3">
                 <h2 className="font-display font-bold text-lg text-card-foreground">
                   {day.dateLabel}
@@ -88,15 +78,9 @@ export function HomeClient({ days, isFallback }: HomeClientProps) {
                         href={`/daily?date=${day.date}&highlight=${encodeURIComponent(item.title)}`}
                         className="block border border-border/25 rounded-md bg-muted/50 px-5 py-4 hover:border-primary/40 hover:shadow-float transition-all duration-200"
                       >
-                        <h3 className="text-base font-medium text-card-foreground">
-                          {item.title}
-                        </h3>
-                        <p className="text-xs text-muted-foreground mt-2">
-                          {item.source}
-                        </p>
-                        <p className="text-sm text-card-foreground/70 mt-2 leading-relaxed line-clamp-2">
-                          {item.summary}
-                        </p>
+                        <h3 className="text-base font-medium text-card-foreground">{item.title}</h3>
+                        <p className="text-xs text-muted-foreground mt-2">{item.source}</p>
+                        <p className="text-sm text-card-foreground/70 mt-2 leading-relaxed line-clamp-2">{item.summary}</p>
                       </Link>
                     ))}
                   </div>

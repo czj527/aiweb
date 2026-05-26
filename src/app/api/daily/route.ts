@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
           newsCount: r.news_count,
         })
       );
-      return NextResponse.json({ success: true, data: transformed });
+      return NextResponse.json({ success: true, data: transformed }, { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" } });
     }
 
     // 获取指定日期或最新日报
@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
       createdAt: r.created_at,
     };
 
-    return NextResponse.json({ success: true, data: transformed });
+    return NextResponse.json({ success: true, data: transformed }, { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" } });
   } catch (e) {
     const errorMessage = e instanceof Error ? e.message : "Unknown error";
     console.error("[Daily GET] Error:", errorMessage);
