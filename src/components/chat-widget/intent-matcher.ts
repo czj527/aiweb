@@ -131,17 +131,19 @@ export async function executePublicIntent(
       try {
         const res = await fetch(`${base}/api/leaderboard?source=datalearner-comprehensive`);
         const json = await res.json();
-        const data = json?.data?.entries || json?.data || json?.entries || [];
-        if (!Array.isArray(data) || data.length === 0) {
+        // API返回: { success, data: { rankings: [...], sourceLabel, metric, ... } }
+        const rankings = json?.data?.rankings || json?.data?.entries || [];
+        if (!Array.isArray(rankings) || rankings.length === 0) {
           return { text: '排行榜数据暂时为空 📊', link: '/leaderboard' };
         }
-        const lines = data
+        const metric = json?.data?.metric || '分数';
+        const lines = rankings
           .slice(0, 5)
           .map(
-            (m: { model_name?: string; name?: string; rank_position?: number; score?: number }, i: number) =>
-              `${i + 1}. ${m.model_name || m.name || '未知'}${
-                m.score ? ` (${m.score})` : ''
-              }`
+            (m: { modelName?: string; model_name?: string; name?: string; score?: number; developer?: string }, i: number) =>
+              `${i + 1}. ${m.modelName || m.model_name || m.name || '未知'}${
+                m.score ? ` (${m.score}${metric ? ' ' + metric : ''})` : ''
+              }${m.developer && m.developer !== '未知' ? ` — ${m.developer}` : ''}`
           );
         return {
           text: `🏆 热门模型TOP5：\n${lines.join('\n')}`,
