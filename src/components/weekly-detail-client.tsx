@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Calendar, BookOpen } from 'lucide-react';
 
@@ -17,7 +18,8 @@ interface WeeklyDigest {
 }
 
 interface WeeklyDetailClientProps {
-  digest: WeeklyDigest;
+  digest: WeeklyDigest | null;
+  id: string;
 }
 
 function formatDate(dateStr: string): string {
@@ -40,7 +42,50 @@ function renderMarkdown(content: string): string {
     .replace(/\n/g, '<br/>');
 }
 
-export function WeeklyDetailClient({ digest }: WeeklyDetailClientProps) {
+export function WeeklyDetailClient({ digest: initialDigest, id }: WeeklyDetailClientProps) {
+  const [digest, setDigest] = useState<WeeklyDigest | null>(initialDigest);
+  const [loading, setLoading] = useState(false);
+  const [notFound, setNotFound] = useState(false);
+
+  useEffect(() => {
+    // SSR数据为空时，客户端fetch API兜底
+    if (!initialDigest) {
+      setLoading(true);
+      fetch(`/api/weekly/${id}`)
+        .then(res => {
+          if (!res.ok) throw new Error('Not found');
+          return res.json();
+        })
+        .then(data => {
+          if (data) setDigest(data);
+          else setNotFound(true);
+        })
+        .catch(() => setNotFound(true))
+        .finally(() => setLoading(false));
+    }
+  }, [initialDigest, id]);
+
+  if (loading) {
+    return (
+      <main className="max-w-5xl mx-auto px-8 py-8">
+        <div className="flex flex-col items-center justify-center py-32 gap-4">
+          <p className="text-muted-foreground">加载中...</p>
+        </div>
+      </main>
+    );
+  }
+
+  if (notFound || !digest) {
+    return (
+      <main className="max-w-5xl mx-auto px-8 py-8">
+        <div className="flex flex-col items-center justify-center py-32 gap-4">
+          <p className="text-muted-foreground">周报不存在</p>
+          <Link href="/weekly" className="text-primary hover:underline text-sm">返回周报列表</Link>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="max-w-5xl mx-auto px-8 py-8">
       {/* 面包屑 */}

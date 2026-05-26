@@ -8,11 +8,17 @@ interface WeeklyDetailPageProps {
 
 export default async function WeeklyDetailPage({ params }: WeeklyDetailPageProps) {
   const { id } = await params;
-  const digest = await getWeeklyDigest(id);
-
-  if (!digest) {
-    notFound();
+  let digest = null;
+  try {
+    digest = await getWeeklyDigest(id);
+  } catch (e) {
+    console.error('[weekly-detail] Failed to load:', e);
   }
 
-  return <WeeklyDetailClient digest={digest} />;
+  if (!digest) {
+    // 不直接notFound，让客户端组件尝试fetch兜底
+    return <WeeklyDetailClient digest={null} id={id} />;
+  }
+
+  return <WeeklyDetailClient digest={digest} id={id} />;
 }

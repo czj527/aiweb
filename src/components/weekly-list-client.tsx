@@ -1,7 +1,8 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, BookOpen, Tag } from 'lucide-react';
+import { ArrowLeft, Calendar, BookOpen } from 'lucide-react';
 
 interface WeeklyItem {
   id: string;
@@ -23,7 +24,47 @@ function formatDate(dateStr: string): string {
   return `${d.getMonth() + 1}月${d.getDate()}日`;
 }
 
-export function WeeklyListClient({ items }: WeeklyListClientProps) {
+export function WeeklyListClient({ items: initialItems }: WeeklyListClientProps) {
+  const [items, setItems] = useState<WeeklyItem[]>(initialItems);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    // SSR数据为空时，客户端fetch API兜底
+    if (initialItems.length === 0) {
+      setLoading(true);
+      fetch('/api/weekly')
+        .then(res => res.json())
+        .then(data => {
+          if (data.items && data.items.length > 0) {
+            setItems(data.items);
+          }
+        })
+        .catch(console.error)
+        .finally(() => setLoading(false));
+    }
+  }, [initialItems.length]);
+
+  if (loading) {
+    return (
+      <main className="max-w-5xl mx-auto px-8 py-8">
+        <div className="flex flex-col items-center justify-center py-32 gap-4">
+          <p className="text-muted-foreground">加载中...</p>
+        </div>
+      </main>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <main className="max-w-5xl mx-auto px-8 py-8">
+        <div className="flex flex-col items-center justify-center py-32 gap-4">
+          <p className="text-muted-foreground">暂无周报数据</p>
+          <p className="text-sm text-muted-foreground/60">每周日晚自动生成</p>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="max-w-5xl mx-auto px-8 py-8">
       {/* 面包屑 */}

@@ -1,7 +1,7 @@
 import { getWeeklyDigestList } from '@/lib/services/db-service';
 import { WeeklyListClient } from '@/components/weekly-list-client';
 
-export const revalidate = 600;
+export const revalidate = 60;
 
 export default async function WeeklyPage() {
   let items: Array<{
