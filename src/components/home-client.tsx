@@ -22,9 +22,8 @@ export function HomeClient({ days: initialDays }: HomeClientProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [fetched, setFetched] = useState(false);
-  const [slideDirection, setSlideDirection] = useState<'left' | 'right'>('left');
-  const [isAnimating, setIsAnimating] = useState(false);
-  const prevCategoryRef = useRef<string>('');
+  // Per-day animation state
+  const [animatingDay, setAnimatingDay] = useState<Map<number, 'left' | 'right'>>(new Map());
 
   useEffect(() => {
     if (fetched) return;
@@ -87,9 +86,9 @@ export function HomeClient({ days: initialDays }: HomeClientProps) {
     const indexMap = categoryIndexRef.current;
     const oldIndex = oldCategory ? (indexMap.get(oldCategory) ?? 0) : 0;
     const newIndex = indexMap.get(category) ?? 0;
-    setSlideDirection(newIndex > oldIndex ? 'left' : 'right');
-    setIsAnimating(true);
-    prevCategoryRef.current = oldCategory || '';
+    const direction = newIndex > oldIndex ? 'left' : 'right';
+
+    setAnimatingDay(new Map([[dayIndex, direction]]));
 
     setActiveCategoryByDay((prev) => {
       const next = new Map(prev);
@@ -97,7 +96,7 @@ export function HomeClient({ days: initialDays }: HomeClientProps) {
       return next;
     });
 
-    setTimeout(() => setIsAnimating(false), 400);
+    setTimeout(() => setAnimatingDay(new Map()), 400);
   }, [activeCategoryByDay]);
 
   if (loading) {
@@ -147,6 +146,7 @@ export function HomeClient({ days: initialDays }: HomeClientProps) {
           const activeCategory = activeCategoryByDay.get(dayIndex) || day.categories[0]?.category || '';
           const activeGroup = day.categories.find((c) => c.category === activeCategory);
           const totalCount = day.categories.reduce((sum, c) => sum + c.count, 0);
+          const dayAnimDir = animatingDay.get(dayIndex);
 
           return (
             <section
@@ -179,8 +179,8 @@ export function HomeClient({ days: initialDays }: HomeClientProps) {
                   <div
                     key={activeCategory}
                     className={`grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4 ${
-                      isAnimating
-                        ? (slideDirection === 'left' ? 'page-flip-in-right' : 'page-flip-in-left')
+                      dayAnimDir
+                        ? (dayAnimDir === 'left' ? 'page-flip-in-right' : 'page-flip-in-left')
                         : ''
                     }`}
                   >
