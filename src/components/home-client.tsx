@@ -19,7 +19,7 @@ export function HomeClient({ days: initialDays }: HomeClientProps) {
   const [error, setError] = useState('');
   const [fetched, setFetched] = useState(false);
 
-  // SSR 数据不完整时（RSS降级只有1天），客户端 fetch API 拿完整7天
+  // SSR 数据不完整时（RSS降级只有1天），客户端 fetch API 拿本周完整数据
   useEffect(() => {
     if (fetched) return;
     if (initialDays.length === 0 || isRSSData(initialDays)) {

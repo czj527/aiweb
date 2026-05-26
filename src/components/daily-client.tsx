@@ -177,20 +177,45 @@ export function DailyContent({ initialReport, initialArchive, initialDate, highl
           {archiveList.length === 0 ? (
             <div className="col-span-full text-center py-16 text-muted-foreground text-sm">暂无往期日报</div>
           ) : (
-            archiveList.map((item) => (
-              <button key={item.id} onClick={() => loadByDate(item.reportDate)} className="w-full text-left block p-5 bg-card rounded-lg border border-border/30 hover:border-primary/30 hover:shadow-sm transition-all">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-semibold text-foreground">{formatDate(item.reportDate)}</h3>
-                    {item.overview && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{item.overview.slice(0, 100)}...</p>}
+            archiveList.map((item) => {
+              const isArchived = !item.overview || item.overview.trim() === '';
+              const juyaUrl = `https://imjuya.github.io/juya-ai-daily/daily/${item.reportDate}.html`;
+              return isArchived ? (
+                <a
+                  key={item.id}
+                  href={juyaUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full text-left block p-5 bg-card rounded-lg border border-border/30 hover:border-primary/30 hover:shadow-sm transition-all opacity-70"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground">{formatDate(item.reportDate)}</h3>
+                      <p className="text-xs text-primary mt-1 flex items-center gap-1">
+                        ↗ 查看橘鸦AI早报原文
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0 ml-4">
+                      <span className="text-xs text-muted-foreground">{item.newsCount} 条</span>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground/40" />
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0 ml-4">
-                    <span className="text-xs text-muted-foreground">{item.newsCount} 条</span>
-                    <ChevronRight className="w-4 h-4 text-muted-foreground/40" />
+                </a>
+              ) : (
+                <button key={item.id} onClick={() => loadByDate(item.reportDate)} className="w-full text-left block p-5 bg-card rounded-lg border border-border/30 hover:border-primary/30 hover:shadow-sm transition-all">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground">{formatDate(item.reportDate)}</h3>
+                      {item.overview && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{item.overview.slice(0, 100)}...</p>}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0 ml-4">
+                      <span className="text-xs text-muted-foreground">{item.newsCount} 条</span>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground/40" />
+                    </div>
                   </div>
-                </div>
-              </button>
-            ))
+                </button>
+              );
+            })
           )}
         </div>
       )}

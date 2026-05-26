@@ -119,9 +119,15 @@ export async function POST(request: NextRequest) {
         return await handleDailyGenerate();
       case "leaderboard":
         return await handleLeaderboardFetch();
+      case "weekly":
+        // 周报生成转发到专门的路由
+        return NextResponse.redirect(new URL('/api/admin/generate-weekly', request.url));
+      case "cleanup":
+        // 数据清理转发到专门的路由
+        return NextResponse.redirect(new URL('/api/admin/cleanup', request.url));
       default:
         return NextResponse.json(
-          { error: "未知操作，支持: juya-check, daily, leaderboard" },
+          { error: "未知操作，支持: juya-check, daily, leaderboard, weekly, cleanup" },
           { status: 400 }
         );
     }

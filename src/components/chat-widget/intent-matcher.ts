@@ -162,10 +162,21 @@ export async function executePublicIntent(
     }
 
     case 'weekly': {
-      return {
-        text: '📋 每周深度摘要功能正在开发中，敬请期待！',
-        link: '/daily',
-      };
+      try {
+        const res = await fetch(`${base}/api/weekly?limit=1`);
+        const data = await res.json();
+        const items = data?.items || [];
+        if (!Array.isArray(items) || items.length === 0) {
+          return { text: '本周周报尚未生成，每周日晚自动产出 📋', link: '/weekly' };
+        }
+        const latest = items[0];
+        return {
+          text: `📋 最新周报：${latest.title || '本周摘要'}\n${latest.summary || `${latest.news_count}条资讯`}\n${latest.week_start} ~ ${latest.week_end}`,
+          link: `/weekly/${latest.id}`,
+        };
+      } catch {
+        return { text: '获取周报失败，请稍后再试 😅' };
+      }
     }
 
     default:

@@ -4,7 +4,7 @@ import { HomeClient } from '@/components/home-client';
 export const revalidate = 300;
 
 export default async function HomePage() {
-  const { days } = await fetchRecentNews(7);
+  const { days } = await fetchRecentNews();
 
   if (days.length === 0) {
     return (
