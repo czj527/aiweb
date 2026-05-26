@@ -18,7 +18,7 @@ import {
   replaceLeaderboard,
 } from "@/lib/services/db-service";
 
-// 排行榜预置数据（与 /api/leaderboard/fetch 保持一致）
+// 排行榜预置数据
 interface LeaderboardEntry {
   model_name: string;
   developer: string;
@@ -74,12 +74,31 @@ const SOURCE_DB_MAP: Record<string, { dbSource: string; dbCategory: string }> = 
   "datalearner-agent": { dbSource: "datalearner", dbCategory: "agent" },
 };
 
+/** 安全写入日志：Supabase 不可用时跳过 */
+async function safeCreateLog(type: "daily" | "weekly" | "collect" | "daily-sync" | "rss-collect" | "juya-check" | "leaderboard", targetDate: string): Promise<string | null> {
+  try {
+    return await createGenerationLog(type, targetDate);
+  } catch {
+    console.warn("[AdminSync] Cannot create log (Supabase unavailable), skipping");
+    return null;
+  }
+}
+
+async function safeUpdateLog(id: string | null, data: { status: string; errorMessage?: string; discoveredCount?: number; afterDedupCount?: number; afterFilterCount?: number }) {
+  if (!id) return;
+  try {
+    await updateGenerationLog(id, data);
+  } catch {
+    console.warn("[AdminSync] Cannot update log (Supabase unavailable), skipping");
+  }
+}
+
 /**
  * POST /api/admin/sync
  * Admin 专用同步端点，验证 admin cookie 身份
  * 
  * body: { action: "juya-check" | "daily" | "leaderboard" }
- *   - juya-check: 采集橘鸦RSS + 生成日报
+ *   - juya-check: 采集橘鸦RSS + 入库新闻 + 生成日报
  *   - daily: 仅生成日报
  *   - leaderboard: 更新全部排行榜
  */
@@ -116,46 +135,21 @@ export async function POST(request: NextRequest) {
   }
 }
 
-/** 安全写入日志：Supabase 不可用时跳过 */
-async function safeCreateLog(type: "daily" | "weekly" | "collect" | "daily-sync" | "rss-collect" | "juya-check" | "leaderboard", targetDate: string): Promise<string | null> {
-  try {
-    return await createGenerationLog(type, targetDate);
-  } catch {
-    console.warn(`[AdminSync] Cannot create log (Supabase unavailable), skipping`);
-    return null;
-  }
-}
-
-async function safeUpdateLog(id: string | null, data: { status: string; errorMessage?: string; discoveredCount?: number; afterDedupCount?: number; afterFilterCount?: number }) {
-  if (!id) return;
-  try {
-    await updateGenerationLog(id, data);
-  } catch {
-    console.warn(`[AdminSync] Cannot update log (Supabase unavailable), skipping`);
-  }
-}
-
-/** 橘鸦同步：采集RSS + 生成日报 */
+/** 橘鸦同步：采集RSS + 入库新闻 + 生成日报（新闻入库不再受日报是否存在影响） */
 async function handleJuyaCheck() {
   const today = new Date().toISOString().slice(0, 10);
   const logId = await safeCreateLog("juya-check", today);
 
   try {
-    // 检查今日日报是否已存在（Supabase 不可用时跳过检查）
-    if (logId) {
-      try {
-        const existing = await getDailyReportByDate(today);
-        if (existing) {
-          await safeUpdateLog(logId, { status: "skipped", errorMessage: "Report already exists" });
-          return NextResponse.json({
-            success: true,
-            action: "juya-check",
-            message: `${today} 的日报已存在`,
-          });
-        }
-      } catch {
-        console.warn("[AdminSync] Cannot check existing report, proceeding anyway");
+    // 检查今日日报是否已存在（仅标记，不跳过新闻入库）
+    let reportExists = false;
+    try {
+      const existing = await getDailyReportByDate(today);
+      if (existing) {
+        reportExists = true;
       }
+    } catch {
+      console.warn("[AdminSync] Cannot check existing report, proceeding anyway");
     }
 
     // 获取橘鸦RSS
@@ -175,7 +169,7 @@ async function handleJuyaCheck() {
     // URL去重
     const dedupedResults = deduplicateResults(juyaResults);
 
-    // 数据库去重（Supabase 不可用时跳过，使用URL去重后的结果）
+    // 数据库去重
     let freshResults = dedupedResults;
     try {
       freshResults = await dedupAgainstDatabase(dedupedResults, 72);
@@ -187,25 +181,29 @@ async function handleJuyaCheck() {
     // 转换格式
     const processedNews = convertJuyaResults(freshResults);
 
-    // 入库（Supabase 不可用时跳过）
+    // 新闻入库（始终执行，不受日报是否存在影响）
     try {
       await upsertNewsItems(processedNews);
     } catch {
       console.warn("[AdminSync] Cannot save news to DB (Supabase unavailable)");
     }
 
-    // 获取完整日报HTML并创建日报记录
-    const juyaReport = await fetchJuyaDailyReport();
+    // 日报创建（仅在日报不存在时执行）
     let reportId: string | null = null;
-    try {
-      if (juyaReport) {
-        reportId = await createDailyReport(today, juyaReport.content, [], []);
-      } else {
-        reportId = await createDailyReport(today, `今日共 ${processedNews.length} 条AI资讯`, [], []);
+    if (!reportExists) {
+      const juyaReport = await fetchJuyaDailyReport();
+      try {
+        if (juyaReport) {
+          reportId = await createDailyReport(today, juyaReport.content, [], []);
+        } else {
+          reportId = await createDailyReport(today, `今日共 ${processedNews.length} 条AI资讯`, [], []);
+        }
+        console.log(`[AdminSync] Created daily report: ${reportId}`);
+      } catch {
+        console.warn("[AdminSync] Cannot create daily report in DB (Supabase unavailable)");
       }
-      console.log(`[AdminSync] Created daily report: ${reportId}`);
-    } catch {
-      console.warn("[AdminSync] Cannot create daily report in DB (Supabase unavailable)");
+    } else {
+      console.log(`[AdminSync] Daily report already exists for ${today}, skipping report creation`);
     }
 
     await safeUpdateLog(logId, {
@@ -220,7 +218,10 @@ async function handleJuyaCheck() {
       action: "juya-check",
       reportId,
       newsCount: processedNews.length,
-      message: `同步成功，${processedNews.length} 条资讯入库，日报已生成`,
+      reportSkipped: reportExists,
+      message: reportExists
+        ? `同步成功，${processedNews.length} 条资讯入库，日报已存在跳过创建`
+        : `同步成功，${processedNews.length} 条资讯入库，日报已生成`,
     });
   } catch (e) {
     const errorMessage = e instanceof Error ? e.message : "Unknown error";
@@ -284,7 +285,7 @@ async function handleDailyGenerate() {
   }
 }
 
-/** 更新全部排行榜（综合+编程+Agent），直接调用数据库函数不走HTTP */
+/** 更新全部排行榜 */
 async function handleLeaderboardFetch() {
   const sources = ["datalearner-comprehensive", "datalearner-code", "datalearner-agent"];
   const results: Array<{ source: string; success: boolean; count: number; error?: string }> = [];

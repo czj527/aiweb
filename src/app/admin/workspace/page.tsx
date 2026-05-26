@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Navbar } from '@/components/navbar';
 import {
   CheckCircle,
   XCircle,
@@ -203,7 +202,7 @@ export default function AdminWorkspacePage() {
   if (!authenticated) {
     return (
       <div className="min-h-screen bg-background font-sans">
-        <Navbar />
+        
         <div className="max-w-sm mx-auto px-4 py-20">
           <div className="bg-card rounded-xl border border-border p-8">
             <div className="text-center mb-6">
@@ -244,7 +243,7 @@ export default function AdminWorkspacePage() {
 
   return (
     <div className="min-h-screen bg-background font-sans">
-      <Navbar />
+      
       <main className="max-w-4xl mx-auto px-6 py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">

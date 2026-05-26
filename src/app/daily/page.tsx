@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
-import { Navbar } from '@/components/navbar';
 import {
   Calendar,
   ChevronRight,
@@ -204,7 +203,7 @@ function DailyPageContent() {
   if (loading) {
     return (
       <div className="min-h-screen bg-background font-sans">
-        <Navbar />
+        
         <main className="max-w-5xl mx-auto px-8 py-8">
           <div className="animate-pulse space-y-6">
             <div className="h-8 bg-muted rounded w-48" />
@@ -217,7 +216,7 @@ function DailyPageContent() {
 
   return (
     <div className="min-h-screen bg-background font-sans">
-      <Navbar />
+      
       <main className="max-w-5xl mx-auto px-8 py-8">
         {/* 顶部栏 */}
         <div className="flex items-center justify-between mb-8 border-b border-border/30 pb-6">
