@@ -56,7 +56,7 @@ const DOT_SIZES: Record<number, number> = {
 const YEAR_WIDTH = 600;
 const START_YEAR = 1920;
 const START_POS = 40;
-const MAIN_LINE_TOP = 300;
+const MAIN_LINE_TOP = 80; // 主线靠近顶部，事件往下展开
 
 // ─── Component ──────────────────────────────────────────────────────
 
@@ -89,13 +89,11 @@ export function TimelineClient({ initialMilestones }: { initialMilestones: Miles
     if (hasInitialized.current) return;
     if (milestones.length === 0) return;
     
-    // 计算 2017 年的位置
     const targetYear = 2017;
     const targetPos = START_POS + (targetYear - START_YEAR) * YEAR_WIDTH;
     const containerWidth = containerRef.current?.clientWidth || 1200;
     const scrollToPos = Math.max(0, targetPos - containerWidth / 2);
     
-    // 延迟执行确保容器已渲染
     const timer = setTimeout(() => {
       if (containerRef.current) {
         containerRef.current.scrollLeft = scrollToPos;
@@ -278,7 +276,7 @@ export function TimelineClient({ initialMilestones }: { initialMilestones: Miles
         </div>
       </header>
 
-      {/* 时间线容器 - 增加顶部 padding 避免被导航栏遮挡 */}
+      {/* 时间线容器 */}
       <div
         ref={containerRef}
         className="overflow-x-auto overflow-y-visible cursor-grab active:cursor-grabbing scrollbar-thin scrollbar-thumb-[#c9ada7] scrollbar-track-[#e5e5e5]"
@@ -291,17 +289,17 @@ export function TimelineClient({ initialMilestones }: { initialMilestones: Miles
         onScroll={handleScroll}
       >
         <div
-          className="relative pt-16"
-          style={{ width: `${totalWidth}px`, minHeight: '600px', paddingBottom: '120px', paddingTop: '100px' }}
+          className="relative"
+          style={{ width: `${totalWidth}px`, minHeight: '500px' }}
         >
-          {/* 时间轴主线 */}
+          {/* 时间轴主线 - 靠近顶部 */}
           <div
             className="absolute left-0 right-0 h-0.5 bg-[#d1d5db] rounded"
             style={{ top: `${MAIN_LINE_TOP}px` }}
           />
 
-          {/* 年份标记 - 只显示关键年份 */}
-          <div className="absolute left-0 right-0 flex justify-between" style={{ top: `${MAIN_LINE_TOP + 40}px` }}>
+          {/* 年份标记 - 在主线上方 */}
+          <div className="absolute left-0 right-0 flex justify-between" style={{ top: `${MAIN_LINE_TOP - 25}px` }}>
             {[1920, 1930, 1940, 1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020, 2026].map(year => (
               <div
                 key={year}
@@ -311,28 +309,13 @@ export function TimelineClient({ initialMilestones }: { initialMilestones: Miles
                 {year}
                 <div
                   className="absolute w-0.5 h-3 bg-[#d1d5db]"
-                  style={{ top: '-20px', left: '50%' }}
+                  style={{ top: '18px', left: '50%' }}
                 />
               </div>
             ))}
           </div>
 
-          {/* 季度刻度 - 只显示 2000 年后的 */}
-          <div className="absolute left-0 right-0" style={{ top: `${MAIN_LINE_TOP + 25}px` }}>
-            {Array.from({ length: 27 }, (_, i) => START_YEAR + i).flatMap(year =>
-              [1, 2, 3, 4].map(q => (
-                <div
-                  key={`${year}-Q${q}`}
-                  className="absolute text-[8px] text-muted-foreground/40"
-                  style={{ left: `${START_POS + (year - START_YEAR) * YEAR_WIDTH + (q - 1) * (YEAR_WIDTH / 4)}px` }}
-                >
-                  Q{q}
-                </div>
-              ))
-            )}
-          </div>
-
-          {/* 事件组 */}
+          {/* 事件组 - 全部在主线下方 */}
           {filteredMilestones.map((milestone, index) => {
             const xPos = getEventPosition(milestone.date);
             const color = CATEGORY_COLORS[milestone.category];
@@ -343,41 +326,40 @@ export function TimelineClient({ initialMilestones }: { initialMilestones: Miles
             return (
               <div
                 key={milestone.id}
-                className="absolute transition-all duration-300 event-card cursor-pointer"
+                className="absolute event-card cursor-pointer"
                 style={{
                   left: `${xPos}px`,
-                  top: `${MAIN_LINE_TOP - lineHeight}px`,
+                  top: `${MAIN_LINE_TOP}px`,
                   transform: 'translateX(-50%)',
-                  color,
                   opacity: 0,
-                  animation: `fadeSlideIn 0.4s ease forwards`,
+                  animation: `fadeSlideDown 0.4s ease forwards`,
                   animationDelay: `${Math.min(index * 30, 500)}ms`,
                 }}
                 onClick={() => toggleCard(milestone.id)}
               >
-                {/* 竖线：从圆点（主线位置）向上延伸 */}
+                {/* 竖线：从主线向下延伸 */}
                 <div
                   className="absolute left-1/2 -translate-x-1/2 w-0.5 bg-current transition-all duration-300"
                   style={{
                     top: 0,
-                    height: isExpanded ? `${lineHeight + 120}px` : `${lineHeight}px`,
+                    height: `${lineHeight}px`,
                   }}
                 />
 
-                {/* 圆点：紧贴竖线顶端（在主线上） */}
+                {/* 圆点：在竖线底端 */}
                 <div
                   className="absolute left-1/2 -translate-x-1/2 rounded-full transition-transform duration-200 hover:scale-130"
                   style={{
-                    top: 0,
+                    top: `${lineHeight - dotSize / 2}px`,
                     width: `${dotSize}px`,
                     height: `${dotSize}px`,
                     backgroundColor: 'currentColor',
                   }}
                 />
 
-                {/* 日期标签：在圆点上方 */}
+                {/* 日期标签：在圆点下方 */}
                 <div
-                  className={`absolute left-1/2 -translate-x-1/2 text-center transition-all whitespace-nowrap pointer-events-none ${
+                  className={`absolute left-1/2 -translate-x-1/2 text-center whitespace-nowrap pointer-events-none ${
                     milestone.importance >= 5
                       ? 'text-[11px] font-bold opacity-90'
                       : milestone.importance >= 4
@@ -386,30 +368,30 @@ export function TimelineClient({ initialMilestones }: { initialMilestones: Miles
                       ? 'text-[9px]'
                       : 'text-[8px] opacity-70'
                   }`}
-                  style={{ top: `-${lineHeight + 15}px`, color: 'inherit' }}
+                  style={{ top: `${lineHeight + 8}px`, color: 'inherit' }}
                 >
                   {formatDate(milestone.date, milestone.importance)}
                 </div>
 
                 {/* 标题：在日期下方 */}
                 <div
-                  className={`absolute left-1/2 -translate-x-1/2 text-center transition-all whitespace-nowrap pointer-events-none ${
+                  className={`absolute left-1/2 -translate-x-1/2 text-center whitespace-nowrap pointer-events-none ${
                     milestone.importance >= 5
                       ? 'text-[10px] font-semibold'
                       : 'text-[9px] opacity-75'
                   }`}
-                  style={{ top: `-${lineHeight + 30}px`, color: 'inherit' }}
+                  style={{ top: `${lineHeight + 22}px`, color: 'inherit' }}
                 >
                   {milestone.title.length > 15 ? milestone.title.slice(0, 15) + '...' : milestone.title}
                 </div>
 
-                {/* 展开卡片：默认隐藏，点击后显示完整描述 */}
+                {/* 展开卡片：在标题下方，点击展开 */}
                 <div
-                  className={`absolute left-1/2 -translate-x-1/2 bg-card rounded-xl border-l-[3px] shadow-lg p-3.5 min-w-[200px] max-w-[280px] transition-all duration-300 ${
-                    isExpanded ? 'opacity-100 scale-100' : 'opacity-0 scale-90 pointer-events-none'
+                  className={`absolute left-1/2 -translate-x-1/2 bg-card rounded-xl border-l-[3px] shadow-lg p-3.5 min-w-[220px] max-w-[280px] transition-all duration-300 ${
+                    isExpanded ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'
                   }`}
                   style={{
-                    top: `-${lineHeight + 130}px`,
+                    top: `${lineHeight + 40}px`,
                     borderLeftColor: color,
                   }}
                 >
@@ -454,10 +436,10 @@ export function TimelineClient({ initialMilestones }: { initialMilestones: Miles
 
       {/* 入场动画 */}
       <style jsx global>{`
-        @keyframes fadeSlideIn {
+        @keyframes fadeSlideDown {
           from {
             opacity: 0;
-            transform: translateX(-50%) translateY(10px);
+            transform: translateX(-50%) translateY(-10px);
           }
           to {
             opacity: 1;

@@ -22,8 +22,9 @@ export function HomeClient({ days: initialDays }: HomeClientProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [fetched, setFetched] = useState(false);
-  // 滑动方向状态：'left' 表示新内容从右滑入，'right' 表示新内容从左滑入
   const [slideDirection, setSlideDirection] = useState<'left' | 'right'>('left');
+  const [isAnimating, setIsAnimating] = useState(false);
+  const prevCategoryRef = useRef<string>('');
 
   useEffect(() => {
     if (fetched) return;
@@ -57,16 +58,13 @@ export function HomeClient({ days: initialDays }: HomeClientProps) {
     return map;
   });
 
-  // 记录每个分类在列表中的索引
   const categoryIndexRef = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
-    // 构建分类索引映射
     const indexMap = new Map<string, number>();
     days.forEach((day) => {
       day.categories.forEach((cat) => {
-        const existingIndex = indexMap.get(cat.category);
-        if (existingIndex === undefined) {
+        if (!indexMap.has(cat.category)) {
           indexMap.set(cat.category, indexMap.size);
         }
       });
@@ -85,23 +83,22 @@ export function HomeClient({ days: initialDays }: HomeClientProps) {
   }, [days]);
 
   const handleCategorySwitch = useCallback((dayIndex: number, category: string) => {
+    const oldCategory = activeCategoryByDay.get(dayIndex);
+    const indexMap = categoryIndexRef.current;
+    const oldIndex = oldCategory ? (indexMap.get(oldCategory) ?? 0) : 0;
+    const newIndex = indexMap.get(category) ?? 0;
+    setSlideDirection(newIndex > oldIndex ? 'left' : 'right');
+    setIsAnimating(true);
+    prevCategoryRef.current = oldCategory || '';
+
     setActiveCategoryByDay((prev) => {
-      const oldCategory = prev.get(dayIndex);
-      const indexMap = categoryIndexRef.current;
-      
-      // 计算滑动方向
-      const oldIndex = oldCategory ? (indexMap.get(oldCategory) ?? 0) : 0;
-      const newIndex = indexMap.get(category) ?? 0;
-      
-      // 新分类在旧分类右边 -> 向左滑（新内容从右来）
-      // 新分类在旧分类左边 -> 向右滑（新内容从左来）
-      setSlideDirection(newIndex > oldIndex ? 'left' : 'right');
-      
       const next = new Map(prev);
       next.set(dayIndex, category);
       return next;
     });
-  }, []);
+
+    setTimeout(() => setIsAnimating(false), 400);
+  }, [activeCategoryByDay]);
 
   if (loading) {
     return (
@@ -177,20 +174,21 @@ export function HomeClient({ days: initialDays }: HomeClientProps) {
                   </div>
                 </div>
               )}
-              <div className="px-6 pb-5 overflow-hidden">
+              <div className="px-6 pb-5 overflow-hidden relative">
                 {activeGroup && activeGroup.items.length > 0 && (
                   <div
                     key={activeCategory}
                     className={`grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4 ${
-                      slideDirection === 'left' ? 'animate-slide-from-right' : 'animate-slide-from-left'
+                      isAnimating
+                        ? (slideDirection === 'left' ? 'page-flip-in-right' : 'page-flip-in-left')
+                        : ''
                     }`}
                   >
-                    {activeGroup.items.map((item, itemIdx) => (
+                    {activeGroup.items.map((item) => (
                       <Link
                         key={item.id}
                         href={`/daily?date=${day.date}&highlight=${encodeURIComponent(item.title)}`}
                         className="group block border border-border/25 rounded-xl bg-muted/30 px-5 py-4 hover:border-primary/30 hover:bg-muted/50 transition-all duration-300 hover:shadow-float"
-                        style={{ animationDelay: `${itemIdx * 0.04}s` }}
                       >
                         <h3 className="text-base font-medium text-card-foreground group-hover:text-primary transition-colors duration-200">{item.title}</h3>
                         <p className="text-xs text-muted-foreground/60 mt-1.5">{item.source}</p>
@@ -205,21 +203,21 @@ export function HomeClient({ days: initialDays }: HomeClientProps) {
         })}
       </div>
 
-      {/* 分类切换滑动动画 */}
+      {/* 完整翻页动画 */}
       <style jsx global>{`
-        @keyframes slideInFromRight {
-          from { opacity: 0; transform: translateX(40px); }
-          to { opacity: 1; transform: translateX(0); }
+        @keyframes pageFlipInRight {
+          0% { opacity: 0; transform: translateX(100%); }
+          100% { opacity: 1; transform: translateX(0); }
         }
-        @keyframes slideInFromLeft {
-          from { opacity: 0; transform: translateX(-40px); }
-          to { opacity: 1; transform: translateX(0); }
+        @keyframes pageFlipInLeft {
+          0% { opacity: 0; transform: translateX(-100%); }
+          100% { opacity: 1; transform: translateX(0); }
         }
-        .animate-slide-from-right {
-          animation: slideInFromRight 0.3s ease forwards;
+        .page-flip-in-right {
+          animation: pageFlipInRight 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
         }
-        .animate-slide-from-left {
-          animation: slideInFromLeft 0.3s ease forwards;
+        .page-flip-in-left {
+          animation: pageFlipInLeft 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
         }
       `}</style>
     </main>
