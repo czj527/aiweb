@@ -54,7 +54,7 @@ const DOT_SIZES: Record<number, number> = {
 };
 
 const YEAR_WIDTH = 600;
-const START_YEAR = 2017;
+const START_YEAR = 1920;
 const START_POS = 40;
 const MAIN_LINE_TOP = 300;
 
@@ -64,12 +64,13 @@ export function TimelineClient({ initialMilestones }: { initialMilestones: Miles
   const [milestones, setMilestones] = useState<Milestone[]>(initialMilestones);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedImportance, setSelectedImportance] = useState<string>('all');
-  const [visibleCards, setVisibleCards] = useState<Set<string>>(new Set());
+  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
   const [hasScrolled, setHasScrolled] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
   const startX = useRef(0);
   const scrollLeft = useRef(0);
+  const hasInitialized = useRef(false);
 
   // 如果初始数据为空，从 API 获取
   useEffect(() => {
@@ -82,6 +83,29 @@ export function TimelineClient({ initialMilestones }: { initialMilestones: Miles
         .catch(() => {});
     }
   }, [initialMilestones]);
+
+  // 初始滚动到 2017 位置
+  useEffect(() => {
+    if (hasInitialized.current) return;
+    if (milestones.length === 0) return;
+    
+    // 计算 2017 年的位置
+    const targetYear = 2017;
+    const targetPos = START_POS + (targetYear - START_YEAR) * YEAR_WIDTH;
+    const containerWidth = containerRef.current?.clientWidth || 1200;
+    const scrollToPos = Math.max(0, targetPos - containerWidth / 2);
+    
+    // 延迟执行确保容器已渲染
+    const timer = setTimeout(() => {
+      if (containerRef.current) {
+        containerRef.current.scrollLeft = scrollToPos;
+        hasInitialized.current = true;
+        setHasScrolled(true);
+      }
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, [milestones]);
 
   // 计算事件位置
   const getEventPosition = (dateStr: string) => {
@@ -146,9 +170,9 @@ export function TimelineClient({ initialMilestones }: { initialMilestones: Miles
     }
   };
 
-  // 切换卡片显示
+  // 切换卡片展开/收起
   const toggleCard = (id: string) => {
-    setVisibleCards(prev => {
+    setExpandedCards(prev => {
       const next = new Set(prev);
       if (next.has(id)) {
         next.delete(id);
@@ -160,7 +184,7 @@ export function TimelineClient({ initialMilestones }: { initialMilestones: Miles
   };
 
   // 总宽度
-  const totalWidth = 10 * YEAR_WIDTH + 80;
+  const totalWidth = (2026 - START_YEAR + 1) * YEAR_WIDTH + 80;
 
   return (
     <div className="min-h-screen bg-background font-sans">
@@ -175,7 +199,7 @@ export function TimelineClient({ initialMilestones }: { initialMilestones: Miles
               </div>
               <div>
                 <h1 className="text-2xl sm:text-3xl font-bold font-display text-foreground">AI 发展时间线</h1>
-                <p className="text-sm text-muted-foreground">从 Transformer 到 Agent 的演进历程</p>
+                <p className="text-sm text-muted-foreground">从 1920 年至今的 AI 演进历程</p>
               </div>
             </div>
 
@@ -254,7 +278,7 @@ export function TimelineClient({ initialMilestones }: { initialMilestones: Miles
         </div>
       </header>
 
-      {/* 时间线容器 */}
+      {/* 时间线容器 - 增加顶部 padding 避免被导航栏遮挡 */}
       <div
         ref={containerRef}
         className="overflow-x-auto overflow-y-visible cursor-grab active:cursor-grabbing scrollbar-thin scrollbar-thumb-[#c9ada7] scrollbar-track-[#e5e5e5]"
@@ -268,7 +292,7 @@ export function TimelineClient({ initialMilestones }: { initialMilestones: Miles
       >
         <div
           className="relative pt-16"
-          style={{ width: `${totalWidth}px`, minHeight: '500px', paddingBottom: '80px' }}
+          style={{ width: `${totalWidth}px`, minHeight: '600px', paddingBottom: '120px', paddingTop: '100px' }}
         >
           {/* 时间轴主线 */}
           <div
@@ -276,12 +300,12 @@ export function TimelineClient({ initialMilestones }: { initialMilestones: Miles
             style={{ top: `${MAIN_LINE_TOP}px` }}
           />
 
-          {/* 年份标记 */}
+          {/* 年份标记 - 只显示关键年份 */}
           <div className="absolute left-0 right-0 flex justify-between" style={{ top: `${MAIN_LINE_TOP + 40}px` }}>
-            {Array.from({ length: 11 }, (_, i) => START_YEAR + i).map(year => (
+            {[1920, 1930, 1940, 1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020, 2026].map(year => (
               <div
                 key={year}
-                className="relative font-display text-lg font-bold text-muted-foreground"
+                className="relative font-display text-sm font-bold text-muted-foreground"
                 style={{ transform: 'translateX(-50%)' }}
               >
                 {year}
@@ -293,9 +317,9 @@ export function TimelineClient({ initialMilestones }: { initialMilestones: Miles
             ))}
           </div>
 
-          {/* 季度刻度 */}
+          {/* 季度刻度 - 只显示 2000 年后的 */}
           <div className="absolute left-0 right-0" style={{ top: `${MAIN_LINE_TOP + 25}px` }}>
-            {Array.from({ length: 10 }, (_, i) => START_YEAR + i).flatMap(year =>
+            {Array.from({ length: 27 }, (_, i) => START_YEAR + i).flatMap(year =>
               [1, 2, 3, 4].map(q => (
                 <div
                   key={`${year}-Q${q}`}
@@ -314,14 +338,12 @@ export function TimelineClient({ initialMilestones }: { initialMilestones: Miles
             const color = CATEGORY_COLORS[milestone.category];
             const lineHeight = LINE_HEIGHTS[milestone.importance] || 80;
             const dotSize = DOT_SIZES[milestone.importance] || 10;
-            const isVisible = visibleCards.has(milestone.id);
+            const isExpanded = expandedCards.has(milestone.id);
 
-            // 事件组定位：主线在 MAIN_LINE_TOP，圆点在主线上
-            // 竖线从圆点向上延伸，卡片和日期在圆点上方
             return (
               <div
                 key={milestone.id}
-                className="absolute transition-all duration-300"
+                className="absolute transition-all duration-300 event-card cursor-pointer"
                 style={{
                   left: `${xPos}px`,
                   top: `${MAIN_LINE_TOP - lineHeight}px`,
@@ -335,10 +357,10 @@ export function TimelineClient({ initialMilestones }: { initialMilestones: Miles
               >
                 {/* 竖线：从圆点（主线位置）向上延伸 */}
                 <div
-                  className="absolute left-1/2 -translate-x-1/2 w-0.5 bg-current"
+                  className="absolute left-1/2 -translate-x-1/2 w-0.5 bg-current transition-all duration-300"
                   style={{
                     top: 0,
-                    height: `${lineHeight}px`,
+                    height: isExpanded ? `${lineHeight + 120}px` : `${lineHeight}px`,
                   }}
                 />
 
@@ -353,13 +375,41 @@ export function TimelineClient({ initialMilestones }: { initialMilestones: Miles
                   }}
                 />
 
-                {/* 卡片：显示在圆点上方 */}
+                {/* 日期标签：在圆点上方 */}
                 <div
-                  className={`absolute left-1/2 -translate-x-1/2 bg-card rounded-xl border-l-[3px] shadow-lg p-3.5 min-w-[200px] max-w-[280px] transition-all duration-300 pointer-events-none ${
-                    isVisible ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-90 -translate-y-2'
+                  className={`absolute left-1/2 -translate-x-1/2 text-center transition-all whitespace-nowrap pointer-events-none ${
+                    milestone.importance >= 5
+                      ? 'text-[11px] font-bold opacity-90'
+                      : milestone.importance >= 4
+                      ? 'text-[10px] font-semibold'
+                      : milestone.importance >= 3
+                      ? 'text-[9px]'
+                      : 'text-[8px] opacity-70'
+                  }`}
+                  style={{ top: `-${lineHeight + 15}px`, color: 'inherit' }}
+                >
+                  {formatDate(milestone.date, milestone.importance)}
+                </div>
+
+                {/* 标题：在日期下方 */}
+                <div
+                  className={`absolute left-1/2 -translate-x-1/2 text-center transition-all whitespace-nowrap pointer-events-none ${
+                    milestone.importance >= 5
+                      ? 'text-[10px] font-semibold'
+                      : 'text-[9px] opacity-75'
+                  }`}
+                  style={{ top: `-${lineHeight + 30}px`, color: 'inherit' }}
+                >
+                  {milestone.title.length > 15 ? milestone.title.slice(0, 15) + '...' : milestone.title}
+                </div>
+
+                {/* 展开卡片：默认隐藏，点击后显示完整描述 */}
+                <div
+                  className={`absolute left-1/2 -translate-x-1/2 bg-card rounded-xl border-l-[3px] shadow-lg p-3.5 min-w-[200px] max-w-[280px] transition-all duration-300 ${
+                    isExpanded ? 'opacity-100 scale-100' : 'opacity-0 scale-90 pointer-events-none'
                   }`}
                   style={{
-                    bottom: `${lineHeight + 10}px`,
+                    top: `-${lineHeight + 130}px`,
                     borderLeftColor: color,
                   }}
                 >
@@ -383,22 +433,6 @@ export function TimelineClient({ initialMilestones }: { initialMilestones: Miles
                   >
                     {CATEGORY_NAMES[milestone.category]}
                   </span>
-                </div>
-
-                {/* 日期标签：在卡片上方 */}
-                <div
-                  className={`absolute left-1/2 -translate-x-1/2 text-center transition-opacity whitespace-nowrap pointer-events-none ${
-                    milestone.importance >= 5
-                      ? 'text-[11px] font-bold opacity-90'
-                      : milestone.importance >= 4
-                      ? 'text-[10px] font-semibold'
-                      : milestone.importance >= 3
-                      ? 'text-[9px]'
-                      : 'text-[8px] opacity-70'
-                  }`}
-                  style={{ bottom: `${lineHeight + 55}px`, color: 'inherit' }}
-                >
-                  {formatDate(milestone.date, milestone.importance)}
                 </div>
               </div>
             );

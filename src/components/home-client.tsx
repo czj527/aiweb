@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Loader2, RefreshCw } from 'lucide-react';
 import type { DayData } from '@/lib/services/home-data';
 
@@ -22,6 +22,8 @@ export function HomeClient({ days: initialDays }: HomeClientProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [fetched, setFetched] = useState(false);
+  // 滑动方向状态：'left' 表示新内容从右滑入，'right' 表示新内容从左滑入
+  const [slideDirection, setSlideDirection] = useState<'left' | 'right'>('left');
 
   useEffect(() => {
     if (fetched) return;
@@ -55,6 +57,23 @@ export function HomeClient({ days: initialDays }: HomeClientProps) {
     return map;
   });
 
+  // 记录每个分类在列表中的索引
+  const categoryIndexRef = useRef<Map<string, number>>(new Map());
+
+  useEffect(() => {
+    // 构建分类索引映射
+    const indexMap = new Map<string, number>();
+    days.forEach((day) => {
+      day.categories.forEach((cat) => {
+        const existingIndex = indexMap.get(cat.category);
+        if (existingIndex === undefined) {
+          indexMap.set(cat.category, indexMap.size);
+        }
+      });
+    });
+    categoryIndexRef.current = indexMap;
+  }, [days]);
+
   useEffect(() => {
     setActiveCategoryByDay((prev) => {
       const next = new Map(prev);
@@ -66,7 +85,22 @@ export function HomeClient({ days: initialDays }: HomeClientProps) {
   }, [days]);
 
   const handleCategorySwitch = useCallback((dayIndex: number, category: string) => {
-    setActiveCategoryByDay((prev) => { const next = new Map(prev); next.set(dayIndex, category); return next; });
+    setActiveCategoryByDay((prev) => {
+      const oldCategory = prev.get(dayIndex);
+      const indexMap = categoryIndexRef.current;
+      
+      // 计算滑动方向
+      const oldIndex = oldCategory ? (indexMap.get(oldCategory) ?? 0) : 0;
+      const newIndex = indexMap.get(category) ?? 0;
+      
+      // 新分类在旧分类右边 -> 向左滑（新内容从右来）
+      // 新分类在旧分类左边 -> 向右滑（新内容从左来）
+      setSlideDirection(newIndex > oldIndex ? 'left' : 'right');
+      
+      const next = new Map(prev);
+      next.set(dayIndex, category);
+      return next;
+    });
   }, []);
 
   if (loading) {
@@ -143,11 +177,13 @@ export function HomeClient({ days: initialDays }: HomeClientProps) {
                   </div>
                 </div>
               )}
-              <div className="px-6 pb-5">
+              <div className="px-6 pb-5 overflow-hidden">
                 {activeGroup && activeGroup.items.length > 0 && (
                   <div
                     key={activeCategory}
-                    className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4 animate-fade-in"
+                    className={`grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4 ${
+                      slideDirection === 'left' ? 'animate-slide-from-right' : 'animate-slide-from-left'
+                    }`}
                   >
                     {activeGroup.items.map((item, itemIdx) => (
                       <Link
@@ -169,14 +205,21 @@ export function HomeClient({ days: initialDays }: HomeClientProps) {
         })}
       </div>
 
-      {/* 分类切换动画 */}
+      {/* 分类切换滑动动画 */}
       <style jsx global>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(8px); }
-          to { opacity: 1; transform: translateY(0); }
+        @keyframes slideInFromRight {
+          from { opacity: 0; transform: translateX(40px); }
+          to { opacity: 1; transform: translateX(0); }
         }
-        .animate-fade-in {
-          animation: fadeIn 0.3s ease forwards;
+        @keyframes slideInFromLeft {
+          from { opacity: 0; transform: translateX(-40px); }
+          to { opacity: 1; transform: translateX(0); }
+        }
+        .animate-slide-from-right {
+          animation: slideInFromRight 0.3s ease forwards;
+        }
+        .animate-slide-from-left {
+          animation: slideInFromLeft 0.3s ease forwards;
         }
       `}</style>
     </main>
