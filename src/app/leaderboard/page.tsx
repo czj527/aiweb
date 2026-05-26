@@ -30,10 +30,11 @@ const TABS = [
 type TabKey = typeof TABS[number]['key'];
 
 async function fetchLeaderboard(key: TabKey): Promise<LeaderboardResponse> {
-  const category = key.replace('datalearner-', '');
-  const res = await fetch(`/api/leaderboard?source=datalearner&category=${category}`);
+  const res = await fetch(`/api/leaderboard?source=${key}`);
   if (!res.ok) throw new Error('Failed to fetch leaderboard');
-  return res.json();
+  const json = await res.json();
+  // API returns { success, data: {...} }
+  return json.data || json;
 }
 
 function RankChange({ change }: { change: number }) {
