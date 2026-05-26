@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Newspaper, Menu, X } from 'lucide-react';
+import { Newspaper, Menu, X, Radio } from 'lucide-react';
 import { useState } from 'react';
 
 interface NavLink {
@@ -19,6 +19,7 @@ const links: NavLink[] = [
   { href: '/leaderboard', label: '排行榜', group: 'main' },
   { href: '/tools', label: '工具', group: 'main' },
   { href: '/timeline', label: '时间线', group: 'main' },
+  { href: '/radio', label: '电台', group: 'main' },
   { href: '/admin/workspace', label: '管理', className: 'text-muted-foreground/60 text-xs', group: 'secondary' },
 ];
 
