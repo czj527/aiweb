@@ -18,6 +18,7 @@ const links: NavLink[] = [
   { href: '/daily', label: '日报', group: 'main' },
   { href: '/weekly', label: '周报', group: 'main' },
   { href: '/leaderboard', label: '排行榜', group: 'main' },
+  { href: '/tools', label: '工具', group: 'main' },
   { href: '/admin/workspace', label: '管理', className: 'text-muted-foreground/60 text-xs', group: 'secondary' },
 ];
 
