@@ -9,16 +9,23 @@ interface HomeClientProps {
   days: DayData[];
 }
 
+function isRSSData(days: DayData[]): boolean {
+  return days.length > 0 && days[0].categories.some(c => c.items.some(i => i.id.startsWith('rss-')));
+}
+
 export function HomeClient({ days: initialDays }: HomeClientProps) {
   const [days, setDays] = useState<DayData[]>(initialDays);
-  const [loading, setLoading] = useState(initialDays.length === 0);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [fetched, setFetched] = useState(false);
 
-  // SSR 没拿到数据时，客户端立即 fetch
+  // SSR 数据不完整时（RSS降级只有1天），客户端 fetch API 拿完整7天
   useEffect(() => {
-    if (initialDays.length > 0) return;
-    fetchFromAPI();
-  }, [initialDays.length]);
+    if (fetched) return;
+    if (initialDays.length === 0 || isRSSData(initialDays)) {
+      fetchFromAPI();
+    }
+  }, [initialDays, fetched]);
 
   const fetchFromAPI = useCallback(async () => {
     setLoading(true);
@@ -28,31 +35,7 @@ export function HomeClient({ days: initialDays }: HomeClientProps) {
       const json = await res.json();
       if (json.success && json.data?.days?.length > 0) {
         setDays(json.data.days);
-      } else {
-        // DB 无数据，尝试 RSS 降级
-        const rssRes = await fetch('/api/juya/news');
-        const rssJson = await rssRes.json();
-        if (rssJson.success && rssJson.data?.categories?.length > 0) {
-          const today = new Date();
-          const dateStr = today.toISOString().split('T')[0];
-          const categories = rssJson.data.categories.map(
-            (cat: { category: string; items: Array<{ title: string; url: string; snippet: string; quote?: string }> }) => ({
-              category: cat.category,
-              count: cat.items.length,
-              items: cat.items.map((item, idx: number) => ({
-                id: `rss-${cat.category}-${idx}`,
-                title: item.title,
-                source: '橘鸦AI早报',
-                sourceUrl: item.url || '#',
-                summary: item.quote || item.snippet || '',
-                publishedAt: dateStr,
-              })),
-            })
-          );
-          setDays([{ date: dateStr, dateLabel: `今天 · ${today.getMonth() + 1}月${today.getDate()}日`, categories, totalCount: categories.reduce((s: number, c: { count: number }) => s + c.count, 0) }]);
-        } else {
-          setDays([]);
-        }
+        setFetched(true);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : '加载失败');
@@ -94,7 +77,7 @@ export function HomeClient({ days: initialDays }: HomeClientProps) {
     );
   }
 
-  if (error) {
+  if (error && days.length === 0) {
     return (
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex flex-col items-center justify-center py-32 gap-4">
@@ -112,9 +95,6 @@ export function HomeClient({ days: initialDays }: HomeClientProps) {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex flex-col items-center justify-center py-32 gap-4">
           <p className="text-muted-foreground">暂无资讯数据</p>
-          <button onClick={fetchFromAPI} className="flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm hover:bg-primary/90">
-            <RefreshCw className="w-4 h-4" /> 刷新
-          </button>
         </div>
       </main>
     );
