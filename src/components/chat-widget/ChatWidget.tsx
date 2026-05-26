@@ -144,27 +144,28 @@ export function ChatWidget() {
     [isAdmin]
   );
 
-  // ── 用户输入消息（一律走DeepSeek对话） ──
+  // ── 用户输入消息（一律走DeepSeek对话，流式输出） ──
 
   const sendMessage = useCallback(
     async (text: string) => {
+      const userMsgId = `user-${Date.now()}`;
+      const botMsgId = `bot-${Date.now()}`;
       const userMsg: ChatMessageData = {
-        id: `user-${Date.now()}`,
+        id: userMsgId,
         role: 'user',
         content: text,
       };
-      const loadingMsg: ChatMessageData = {
-        id: 'loading',
+      const streamingMsg: ChatMessageData = {
+        id: botMsgId,
         role: 'assistant',
         content: '',
         loading: true,
       };
 
-      setMessages((prev) => [...prev, userMsg, loadingMsg]);
+      setMessages((prev) => [...prev, userMsg, streamingMsg]);
       setLoading(true);
 
       try {
-        // 用户手动输入 → 一律走DeepSeek API
         const history = messages
           .filter((m) => m.id !== 'welcome' && !m.loading)
           .map((m) => ({
@@ -182,21 +183,87 @@ export function ChatWidget() {
           }),
         });
 
-        const data = await res.json();
-        const reply = data.reply || data.error || '抱歉，我暂时无法回答';
+        if (!res.ok) {
+          // 非 SSE 响应（错误）
+          const data = await res.json().catch(() => ({}));
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === botMsgId
+                ? { ...m, content: data.error || '请求失败，请稍后再试 😅', loading: false }
+                : m
+            )
+          );
+          setLoading(false);
+          return;
+        }
 
+        // SSE 流式读取
+        const reader = res.body?.getReader();
+        if (!reader) {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === botMsgId
+                ? { ...m, content: '流读取失败，请稍后再试 😅', loading: false }
+                : m
+            )
+          );
+          setLoading(false);
+          return;
+        }
+
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let fullContent = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed || !trimmed.startsWith('data: ')) continue;
+
+            const data = trimmed.slice(6);
+            if (data === '[DONE]') continue;
+
+            try {
+              const parsed = JSON.parse(data);
+              if (parsed.error) {
+                fullContent = parsed.error;
+                break;
+              }
+              if (parsed.content) {
+                fullContent += parsed.content;
+                // 逐字更新消息
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === botMsgId
+                      ? { ...m, content: fullContent, loading: false }
+                      : m
+                  )
+                );
+              }
+            } catch { /* skip */ }
+          }
+        }
+
+        // 最终确保 loading 状态关闭
         setMessages((prev) =>
           prev.map((m) =>
-            m.id === 'loading'
-              ? { id: `bot-${Date.now()}`, role: 'assistant', content: reply }
+            m.id === botMsgId
+              ? { ...m, content: fullContent || '抱歉，没有收到回复', loading: false }
               : m
           )
         );
       } catch {
         setMessages((prev) =>
           prev.map((m) =>
-            m.id === 'loading'
-              ? { id: `bot-${Date.now()}`, role: 'assistant', content: '网络错误，请稍后再试 😅' }
+            m.id === botMsgId
+              ? { ...m, content: '网络错误，请稍后再试 😅', loading: false }
               : m
           )
         );
