@@ -105,6 +105,12 @@ export function HomeClient({ days: initialDays }: HomeClientProps) {
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 page-enter">
+      {/* 每日资讯标题 */}
+      <div className="mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold font-display text-foreground">每日资讯</h1>
+        <p className="text-sm text-muted-foreground mt-1">AI领域最新动态，每日自动聚合更新</p>
+      </div>
+
       <div className="flex flex-col gap-8">
         {days.map((day, dayIndex) => {
           const activeCategory = activeCategoryByDay.get(dayIndex) || day.categories[0]?.category || '';
@@ -139,7 +145,10 @@ export function HomeClient({ days: initialDays }: HomeClientProps) {
               )}
               <div className="px-6 pb-5">
                 {activeGroup && activeGroup.items.length > 0 && (
-                  <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
+                  <div
+                    key={activeCategory}
+                    className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4 animate-fade-in"
+                  >
                     {activeGroup.items.map((item, itemIdx) => (
                       <Link
                         key={item.id}
@@ -159,6 +168,17 @@ export function HomeClient({ days: initialDays }: HomeClientProps) {
           );
         })}
       </div>
+
+      {/* 分类切换动画 */}
+      <style jsx global>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+          animation: fadeIn 0.3s ease forwards;
+        }
+      `}</style>
     </main>
   );
 }

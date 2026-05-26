@@ -56,6 +56,7 @@ const DOT_SIZES: Record<number, number> = {
 const YEAR_WIDTH = 600;
 const START_YEAR = 2017;
 const START_POS = 40;
+const MAIN_LINE_TOP = 300;
 
 // ─── Component ──────────────────────────────────────────────────────
 
@@ -266,17 +267,17 @@ export function TimelineClient({ initialMilestones }: { initialMilestones: Miles
         onScroll={handleScroll}
       >
         <div
-          className="relative"
-          style={{ width: `${totalWidth}px`, minHeight: '420px', paddingBottom: '80px' }}
+          className="relative pt-16"
+          style={{ width: `${totalWidth}px`, minHeight: '500px', paddingBottom: '80px' }}
         >
           {/* 时间轴主线 */}
           <div
             className="absolute left-0 right-0 h-0.5 bg-[#d1d5db] rounded"
-            style={{ top: '300px' }}
+            style={{ top: `${MAIN_LINE_TOP}px` }}
           />
 
           {/* 年份标记 */}
-          <div className="absolute left-0 right-0 flex justify-between" style={{ top: '340px' }}>
+          <div className="absolute left-0 right-0 flex justify-between" style={{ top: `${MAIN_LINE_TOP + 40}px` }}>
             {Array.from({ length: 11 }, (_, i) => START_YEAR + i).map(year => (
               <div
                 key={year}
@@ -293,7 +294,7 @@ export function TimelineClient({ initialMilestones }: { initialMilestones: Miles
           </div>
 
           {/* 季度刻度 */}
-          <div className="absolute left-0 right-0" style={{ top: '325px' }}>
+          <div className="absolute left-0 right-0" style={{ top: `${MAIN_LINE_TOP + 25}px` }}>
             {Array.from({ length: 10 }, (_, i) => START_YEAR + i).flatMap(year =>
               [1, 2, 3, 4].map(q => (
                 <div
@@ -315,13 +316,15 @@ export function TimelineClient({ initialMilestones }: { initialMilestones: Miles
             const dotSize = DOT_SIZES[milestone.importance] || 10;
             const isVisible = visibleCards.has(milestone.id);
 
+            // 事件组定位：主线在 MAIN_LINE_TOP，圆点在主线上
+            // 竖线从圆点向上延伸，卡片和日期在圆点上方
             return (
               <div
                 key={milestone.id}
                 className="absolute transition-all duration-300"
                 style={{
                   left: `${xPos}px`,
-                  top: `${300 - lineHeight}px`,
+                  top: `${MAIN_LINE_TOP - lineHeight}px`,
                   transform: 'translateX(-50%)',
                   color,
                   opacity: 0,
@@ -330,23 +333,27 @@ export function TimelineClient({ initialMilestones }: { initialMilestones: Miles
                 }}
                 onClick={() => toggleCard(milestone.id)}
               >
-                {/* 日期标签 */}
+                {/* 竖线：从圆点（主线位置）向上延伸 */}
                 <div
-                  className={`absolute left-1/2 -translate-x-1/2 text-center transition-opacity whitespace-nowrap pointer-events-none ${
-                    milestone.importance >= 5
-                      ? 'text-[11px] font-bold opacity-90'
-                      : milestone.importance >= 4
-                      ? 'text-[10px] font-semibold'
-                      : milestone.importance >= 3
-                      ? 'text-[9px]'
-                      : 'text-[8px] opacity-70'
-                  }`}
-                  style={{ bottom: `${lineHeight + 30}px`, color: 'inherit' }}
-                >
-                  {formatDate(milestone.date, milestone.importance)}
-                </div>
+                  className="absolute left-1/2 -translate-x-1/2 w-0.5 bg-current"
+                  style={{
+                    top: 0,
+                    height: `${lineHeight}px`,
+                  }}
+                />
 
-                {/* 卡片 */}
+                {/* 圆点：紧贴竖线顶端（在主线上） */}
+                <div
+                  className="absolute left-1/2 -translate-x-1/2 rounded-full transition-transform duration-200 hover:scale-130"
+                  style={{
+                    top: 0,
+                    width: `${dotSize}px`,
+                    height: `${dotSize}px`,
+                    backgroundColor: 'currentColor',
+                  }}
+                />
+
+                {/* 卡片：显示在圆点上方 */}
                 <div
                   className={`absolute left-1/2 -translate-x-1/2 bg-card rounded-xl border-l-[3px] shadow-lg p-3.5 min-w-[200px] max-w-[280px] transition-all duration-300 pointer-events-none ${
                     isVisible ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-90 -translate-y-2'
@@ -378,22 +385,21 @@ export function TimelineClient({ initialMilestones }: { initialMilestones: Miles
                   </span>
                 </div>
 
-                {/* 圆点 */}
+                {/* 日期标签：在卡片上方 */}
                 <div
-                  className="absolute left-1/2 -translate-x-1/2 rounded-full transition-transform duration-200 hover:scale-130"
-                  style={{
-                    bottom: `${lineHeight - dotSize / 2}px`,
-                    width: `${dotSize}px`,
-                    height: `${dotSize}px`,
-                    backgroundColor: 'currentColor',
-                  }}
-                />
-
-                {/* 竖线 */}
-                <div
-                  className="absolute left-1/2 -translate-x-1/2 w-0.5 bg-current transition-all"
-                  style={{ height: `${lineHeight}px`, bottom: `-${lineHeight}px` }}
-                />
+                  className={`absolute left-1/2 -translate-x-1/2 text-center transition-opacity whitespace-nowrap pointer-events-none ${
+                    milestone.importance >= 5
+                      ? 'text-[11px] font-bold opacity-90'
+                      : milestone.importance >= 4
+                      ? 'text-[10px] font-semibold'
+                      : milestone.importance >= 3
+                      ? 'text-[9px]'
+                      : 'text-[8px] opacity-70'
+                  }`}
+                  style={{ bottom: `${lineHeight + 55}px`, color: 'inherit' }}
+                >
+                  {formatDate(milestone.date, milestone.importance)}
+                </div>
               </div>
             );
           })}
