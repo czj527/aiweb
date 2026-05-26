@@ -214,10 +214,10 @@ export function HomeClient({ days: initialDays }: HomeClientProps) {
           100% { opacity: 1; transform: translateX(0); }
         }
         .page-flip-in-right {
-          animation: pageFlipInRight 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+          animation: pageFlipInRight 0.6s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
         }
         .page-flip-in-left {
-          animation: pageFlipInLeft 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+          animation: pageFlipInLeft 0.6s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
         }
       `}</style>
     </main>
