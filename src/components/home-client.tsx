@@ -13,16 +13,21 @@ function isRSSData(days: DayData[]): boolean {
   return days.length > 0 && days[0].categories.some(c => c.items.some(i => i.id.startsWith('rss-')));
 }
 
+function isDataIncomplete(days: DayData[]): boolean {
+  // SSR数据看起来有天数但分类为空，说明ISR缓存了旧渲染
+  return days.some(d => d.categories.length === 0);
+}
+
 export function HomeClient({ days: initialDays }: HomeClientProps) {
   const [days, setDays] = useState<DayData[]>(initialDays);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [fetched, setFetched] = useState(false);
 
-  // SSR 数据不完整时（RSS降级只有1天），客户端 fetch API 拿本周完整数据
+  // SSR 数据不完整时（空、RSS降级、或ISR缓存了空数据），客户端 fetch API 拿本周完整数据
   useEffect(() => {
     if (fetched) return;
-    if (initialDays.length === 0 || isRSSData(initialDays)) {
+    if (initialDays.length === 0 || isRSSData(initialDays) || isDataIncomplete(initialDays)) {
       fetchFromAPI();
     }
   }, [initialDays, fetched]);
