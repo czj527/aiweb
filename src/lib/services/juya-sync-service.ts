@@ -14,6 +14,7 @@ import {
   createGenerationLog,
   updateGenerationLog,
   getDailyReportByDate,
+  deleteDailyReportByDate,
   replaceLeaderboard,
 } from "./db-service";
 
@@ -166,22 +167,22 @@ export async function syncJuyaCheck(): Promise<SyncResult> {
     }
 
     let reportId: string | null = null;
-    if (!reportExists) {
-      const juyaReport = await fetchJuyaDailyReport(itemIndex);
-      try {
-        if (juyaReport) {
-          const newsNums = juyaReport.content.match(/#(\d+)<\/code>/g);
-          const overviewNewsCount = newsNums ? Math.max(...newsNums.map(m => parseInt(m.match(/#(\d+)/)?.[1] || '0', 10))) : processedNews.length;
-          reportId = await createDailyReport(today, juyaReport.content, [], [], overviewNewsCount);
-        } else {
-          reportId = await createDailyReport(today, `今日共 ${processedNews.length} 条AI资讯`, [], [], processedNews.length);
+    const juyaReport = await fetchJuyaDailyReport(itemIndex);
+    try {
+      if (juyaReport) {
+        if (reportExists) {
+          await deleteDailyReportByDate(today);
+          console.log(`[SyncService] Deleted stale report for ${today}`);
         }
-        console.log(`[SyncService] Created daily report: ${reportId}`);
-      } catch {
-        console.warn("[SyncService] Cannot create daily report in DB (Supabase unavailable)");
+        const newsNums = juyaReport.content.match(/#(\d+)<\/code>/g);
+        const overviewNewsCount = newsNums ? Math.max(...newsNums.map(m => parseInt(m.match(/#(\d+)/)?.[1] || '0', 10))) : processedNews.length;
+        reportId = await createDailyReport(today, juyaReport.content, [], [], overviewNewsCount);
+        console.log(`[SyncService] Created daily report for ${today}: ${reportId}`);
+      } else {
+        console.warn("[SyncService] No RSS report content available");
       }
-    } else {
-      console.log(`[SyncService] Daily report already exists for ${today}, skipping report creation`);
+    } catch {
+      console.warn("[SyncService] Cannot create daily report in DB (Supabase unavailable)");
     }
 
     await safeUpdateLog(logId, {
@@ -213,23 +214,21 @@ export async function syncDailyGenerate(): Promise<SyncResult> {
   const logId = await safeCreateLog("daily", today);
 
   try {
-    if (logId) {
-      try {
-        const existing = await getDailyReportByDate(today);
-        if (existing) {
-          await safeUpdateLog(logId, { status: "skipped", errorMessage: "Report already exists" });
-          return { success: true, action: "daily", message: "今日日报已存在", reportId: existing.id };
-        }
-      } catch {
-        console.warn("[SyncService] Cannot check existing report, proceeding anyway");
-      }
-    }
-
     const itemIndex = await findTodayItemIndex();
     const juyaReport = await fetchJuyaDailyReport(itemIndex);
     if (!juyaReport) {
       await safeUpdateLog(logId, { status: "empty", errorMessage: "No content from RSS" });
       return { success: true, action: "daily", message: "橘鸦RSS暂无更新" };
+    }
+
+    try {
+      const existing = await getDailyReportByDate(today);
+      if (existing) {
+        await deleteDailyReportByDate(today);
+        console.log(`[SyncService] Deleted stale report for ${today}`);
+      }
+    } catch {
+      console.warn("[SyncService] Cannot check/delete existing report, proceeding anyway");
     }
 
     let reportId: string | null = null;

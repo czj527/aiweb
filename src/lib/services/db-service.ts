@@ -113,6 +113,15 @@ export async function getDailyReportByDate(date: string) {
   return data?.[0] || null;
 }
 
+/** 删除指定日期的日报及其关联新闻 */
+export async function deleteDailyReportByDate(date: string): Promise<void> {
+  const client = getClient();
+  const existing = await getDailyReportByDate(date);
+  if (!existing) return;
+  await client.from("daily_report_news").delete().eq("report_id", existing.id);
+  await client.from("daily_reports").delete().eq("id", existing.id);
+}
+
 /** 获取指定日期的日报 */
 export async function getDailyReport(date: string) {
   const client = getClient();
