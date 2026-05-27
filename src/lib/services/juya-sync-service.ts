@@ -1,6 +1,7 @@
 import {
   fetchJuyaFeed,
   fetchJuyaDailyReport,
+  getAvailableDates,
 } from "./rss-fetch-service";
 import {
   deduplicateResults,
@@ -18,6 +19,25 @@ import {
 
 function toShanghaiDate(date: Date): string {
   return date.toLocaleString("sv-SE", { timeZone: "Asia/Shanghai" }).split(" ")[0];
+}
+
+async function findTodayItemIndex(): Promise<number> {
+  const today = toShanghaiDate(new Date());
+  try {
+    const dates = await getAvailableDates();
+    const match = dates.find((d) => d.date === today);
+    if (match) {
+      console.log(`[SyncService] Found RSS item ${match.itemIndex} for date ${today}`);
+      return match.itemIndex;
+    }
+    const sorted = dates.sort((a, b) => b.date.localeCompare(a.date));
+    const latest = sorted[0];
+    console.log(`[SyncService] No exact match for ${today}, using latest RSS item ${latest.itemIndex} (${latest.date})`);
+    return latest.itemIndex;
+  } catch {
+    console.warn("[SyncService] Cannot get available dates, falling back to index 0");
+    return 0;
+  }
 }
 
 export interface SyncResult {
@@ -118,8 +138,9 @@ export async function syncJuyaCheck(): Promise<SyncResult> {
     }
 
     console.log("[SyncService] Fetching 橘鸦 RSS");
-    const juyaResults = await fetchJuyaFeed();
-    console.log(`[SyncService] Collected ${juyaResults.length} articles`);
+    const itemIndex = await findTodayItemIndex();
+    const juyaResults = await fetchJuyaFeed(itemIndex);
+    console.log(`[SyncService] Collected ${juyaResults.length} articles (RSS item ${itemIndex})`);
 
     if (juyaResults.length === 0) {
       await safeUpdateLog(logId, { status: "no_content", errorMessage: "No content from RSS" });
@@ -146,7 +167,7 @@ export async function syncJuyaCheck(): Promise<SyncResult> {
 
     let reportId: string | null = null;
     if (!reportExists) {
-      const juyaReport = await fetchJuyaDailyReport();
+      const juyaReport = await fetchJuyaDailyReport(itemIndex);
       try {
         if (juyaReport) {
           const newsNums = juyaReport.content.match(/#(\d+)<\/code>/g);
@@ -204,7 +225,8 @@ export async function syncDailyGenerate(): Promise<SyncResult> {
       }
     }
 
-    const juyaReport = await fetchJuyaDailyReport();
+    const itemIndex = await findTodayItemIndex();
+    const juyaReport = await fetchJuyaDailyReport(itemIndex);
     if (!juyaReport) {
       await safeUpdateLog(logId, { status: "empty", errorMessage: "No content from RSS" });
       return { success: true, action: "daily", message: "橘鸦RSS暂无更新" };
@@ -279,8 +301,9 @@ export async function syncRssCollect(): Promise<SyncResult> {
 
   try {
     console.log("[SyncService] Collecting 橘鸦 RSS");
-    const juyaResults = await fetchJuyaFeed();
-    console.log(`[SyncService] Collected ${juyaResults.length} articles`);
+    const itemIndex = await findTodayItemIndex();
+    const juyaResults = await fetchJuyaFeed(itemIndex);
+    console.log(`[SyncService] Collected ${juyaResults.length} articles (RSS item ${itemIndex})`);
 
     if (juyaResults.length === 0) {
       await safeUpdateLog(logId, { status: "no_content", errorMessage: "No content from RSS" });
