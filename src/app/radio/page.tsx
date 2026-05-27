@@ -37,6 +37,12 @@ export default async function RadioPage() {
   const initialBroadcasts = await getInitialBroadcasts();
   return (
     <main className="min-h-screen">
+      <div className="max-w-6xl mx-auto px-4 py-6">
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-3 text-sm text-amber-800 flex items-center gap-2">
+          <span className="text-lg">🚧</span>
+          <span>电台功能正在施工中，音频内容和交互将持续完善</span>
+        </div>
+      </div>
       <RadioClient initialBroadcasts={initialBroadcasts} />
     </main>
   );
