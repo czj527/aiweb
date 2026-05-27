@@ -346,7 +346,7 @@ export default function AdminWorkspacePage() {
         {/* Quick Actions */}
         <div className="mb-8">
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">快捷操作</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <button
               onClick={() => handleSync('juya-check')}
               disabled={syncing !== null}
@@ -383,6 +383,20 @@ export default function AdminWorkspacePage() {
               )}
               {syncing === 'leaderboard' ? '更新中...' : '更新排行榜'}
             </button>
+            <a
+              href="/admin/tools"
+              className="flex items-center justify-center gap-2 px-4 py-3 bg-card border border-border rounded-lg text-sm font-medium text-foreground hover:border-primary/40 transition-colors"
+            >
+              <Zap className="w-4 h-4" />
+              工具管理
+            </a>
+            <a
+              href="/admin/milestones"
+              className="flex items-center justify-center gap-2 px-4 py-3 bg-card border border-border rounded-lg text-sm font-medium text-foreground hover:border-primary/40 transition-colors"
+            >
+              <Clock className="w-4 h-4" />
+              里程碑管理
+            </a>
           </div>
         </div>
 

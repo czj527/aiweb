@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Noto_Serif_SC, Playfair_Display } from 'next/font/google';
 import { Navbar } from '@/components/navbar';
+import { ChatWidget } from '@/components/chat-widget/ChatWidget';
 import './globals.css';
 
 const notoSerifSC = Noto_Serif_SC({
@@ -50,6 +51,7 @@ export default function RootLayout({
       <body className="antialiased font-sans bg-background text-foreground">
         <Navbar />
         {children}
+        <ChatWidget />
       </body>
     </html>
   );

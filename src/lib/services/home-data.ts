@@ -31,9 +31,22 @@ export interface DayData {
 }
 
 export async function fetchRecentNews(days: number = 7): Promise<{ days: DayData[]; isFallback: boolean }> {
+  // 首页展示：本周资讯（从本周一开始算）
+  const now = new Date();
+  const shanghaiStr = now.toLocaleString('sv-SE', { timeZone: 'Asia/Shanghai' });
+  const shanghaiDate = new Date(shanghaiStr);
+  const day = shanghaiDate.getDay();
+  const mondayOffset = day === 0 ? -6 : 1 - day;
+  const monday = new Date(shanghaiDate);
+  monday.setDate(shanghaiDate.getDate() + mondayOffset);
+  const mondayStr = monday.toLocaleString('sv-SE', { timeZone: 'Asia/Shanghai' }).split(' ')[0];
+
+  // 计算本周已经过多少天（用于days参数，RSS降级时需要）
+  const daysSinceMonday = day === 0 ? 7 : day;
+
   // 优先直连 Supabase
   try {
-    const result = await fetchFromDB(days);
+    const result = await fetchFromDB(mondayStr);
     if (result.length > 0) return { days: result, isFallback: false };
   } catch (e) {
     console.error('[HomeData] DB query failed:', e instanceof Error ? e.message : e);
@@ -42,7 +55,9 @@ export async function fetchRecentNews(days: number = 7): Promise<{ days: DayData
   // 降级到橘鸦 RSS
   try {
     const result = await fetchFromRSS();
-    return { days: result, isFallback: true };
+    // RSS降级时只返回本周的数据
+    const filtered = result.filter(d => d.date >= mondayStr);
+    return { days: filtered.length > 0 ? filtered : result.slice(0, daysSinceMonday), isFallback: true };
   } catch (e) {
     console.error('[HomeData] RSS fallback failed:', e instanceof Error ? e.message : e);
   }
@@ -50,18 +65,14 @@ export async function fetchRecentNews(days: number = 7): Promise<{ days: DayData
   return { days: [], isFallback: false };
 }
 
-async function fetchFromDB(validDays: number): Promise<DayData[]> {
+async function fetchFromDB(startDate: string): Promise<DayData[]> {
   const client = getSupabaseClient();
-  const now = new Date();
-  const todayStr = toShanghaiDate(now);
-  const startDate = new Date(now);
-  startDate.setDate(startDate.getDate() - validDays + 1);
-  const startStr = toShanghaiDate(startDate);
+  const todayStr = toShanghaiDate(new Date());
 
   const { data, error } = await client
     .from('news_items')
     .select('id, title, summary, source_name, source_url, category, published_at')
-    .gte('published_at', `${startStr}T00:00:00`)
+    .gte('published_at', `${startDate}T00:00:00`)
     .lt('published_at', `${todayStr}T23:59:59`)
     .order('published_at', { ascending: false })
     .limit(350);
@@ -91,11 +102,9 @@ async function fetchFromDB(validDays: number): Promise<DayData[]> {
   const yesterdayStr = toShanghaiDate(new Date(Date.now() - 86400000));
   const daysData: DayData[] = [];
 
-  for (let i = 0; i < validDays; i++) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - i);
-    const dateStr = toShanghaiDate(d);
-    const catMap = byDate.get(dateStr);
+  // 从startDate到今天遍历
+  for (const [dateStr, catMap] of byDate) {
+    if (dateStr < startDate || dateStr > todayStr) continue;
     if (!catMap || catMap.size === 0) continue;
 
     const categories = Array.from(catMap.entries())
@@ -109,6 +118,7 @@ async function fetchFromDB(validDays: number): Promise<DayData[]> {
         return b.count - a.count;
       });
 
+    const d = new Date(dateStr + 'T00:00:00');
     const monthDay = `${d.getMonth() + 1}月${d.getDate()}日`;
     let dateLabel: string;
     if (dateStr === todayStr) dateLabel = `今天 · ${monthDay}`;
