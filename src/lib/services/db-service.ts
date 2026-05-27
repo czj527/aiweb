@@ -87,11 +87,12 @@ export async function getNewsById(id: string) {
 // ==================== 日报 ====================
 
 /** 创建日报 */
-export async function createDailyReport(date: string, overview: string, hotTopics: string[], newsIds: string[]) {
+export async function createDailyReport(date: string, overview: string, hotTopics: string[], newsIds: string[], customNewsCount?: number) {
   const client = getClient();
   const id = crypto.randomUUID();
+  const newsCount = customNewsCount !== undefined ? customNewsCount : newsIds.length;
   const { error: reportError } = await client.from("daily_reports").insert({
-    id, report_date: date, overview, hot_topics: hotTopics, news_count: newsIds.length, status: "published",
+    id, report_date: date, overview, hot_topics: hotTopics, news_count: newsCount, status: "published",
   });
   if (reportError) throw new Error(`创建日报失败: ${reportError.message}`);
 
@@ -290,4 +291,143 @@ export async function editNews(id: string, updates: { title?: string; summary?: 
   const client = getSupabaseClient();
   const { error } = await client.from("news_items").update(updates).eq("id", id);
   if (error) throw new Error(`编辑新闻失败: ${error.message}`);
+}
+
+// ==================== 周报 ====================
+
+/** 创建周报 */
+export async function createWeeklyDigest(data: {
+  weekStart: string;
+  weekEnd: string;
+  title: string;
+  summary: string;
+  hotTopics: string[];
+  newsCount: number;
+  categories: string[];
+  content: string;
+}) {
+  const client = getClient();
+  const id = crypto.randomUUID();
+  const { error } = await client.from("weekly_digests").insert({
+    id,
+    week_start: data.weekStart,
+    week_end: data.weekEnd,
+    title: data.title,
+    summary: data.summary,
+    hot_topics: data.hotTopics,
+    news_count: data.newsCount,
+    categories: data.categories,
+    content: data.content,
+    status: "published",
+    published_at: new Date().toISOString(),
+  });
+  if (error) throw new Error(`创建周报失败: ${error.message}`);
+  return id;
+}
+
+/** 获取周报列表 */
+export async function getWeeklyDigestList(limit: number = 20) {
+  const client = getClient();
+  const { data, error } = await client
+    .from("weekly_digests")
+    .select("id, week_start, week_end, title, summary, news_count, categories, published_at")
+    .eq("status", "published")
+    .order("week_start", { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(`查询周报列表失败: ${error.message}`);
+  return data || [];
+}
+
+/** 获取指定周报 */
+export async function getWeeklyDigest(id: string) {
+  const client = getClient();
+  const { data, error } = await client
+    .from("weekly_digests")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw new Error(`查询周报详情失败: ${error.message}`);
+  return data;
+}
+
+/** 获取指定周的周报（按week_start） */
+export async function getWeeklyDigestByWeek(weekStart: string) {
+  const client = getClient();
+  const { data, error } = await client
+    .from("weekly_digests")
+    .select("*")
+    .eq("week_start", weekStart)
+    .limit(1);
+  if (error) throw new Error(`查询周报失败: ${error.message}`);
+  return data?.[0] || null;
+}
+
+// ==================== 数据清理 ====================
+
+/** 清理过期数据：周日晚执行 */
+export async function cleanupOldData(weekStart: string) {
+  const client = getClient();
+  const results = { newsDeleted: 0, reportsCleared: 0, associationsDeleted: 0, logsDeleted: 0 };
+
+  // 1. 删除本周之前的新闻
+  const { data: deletedNews, error: newsError } = await client
+    .from("news_items")
+    .delete()
+    .lt("published_at", `${weekStart}T00:00:00+08:00`)
+    .select("id");
+  if (newsError) console.error("[cleanup] 删除新闻失败:", newsError.message);
+  else results.newsDeleted = deletedNews?.length || 0;
+
+  // 2. 清理本周之前的日报：清空正文，保留元数据
+  const { data: clearedReports, error: reportError } = await client
+    .from("daily_reports")
+    .update({ overview: "", hot_topics: [] })
+    .lt("report_date", weekStart)
+    .neq("overview", "")
+    .select("id");
+  if (reportError) console.error("[cleanup] 清理日报失败:", reportError.message);
+  else results.reportsCleared = clearedReports?.length || 0;
+
+  // 3. 删除清理日报的关联记录
+  if (clearedReports && clearedReports.length > 0) {
+    const reportIds = clearedReports.map((r: { id: string }) => r.id);
+    const { data: deletedAssoc, error: assocError } = await client
+      .from("daily_report_news")
+      .delete()
+      .in("report_id", reportIds)
+      .select("id");
+    if (assocError) console.error("[cleanup] 删除关联失败:", assocError.message);
+    else results.associationsDeleted = deletedAssoc?.length || 0;
+  }
+
+  // 4. 删除2周前的生成日志
+  const twoWeeksAgo = new Date(weekStart);
+  twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+  const twoWeeksAgoStr = twoWeeksAgo.toISOString().split("T")[0];
+  const { data: deletedLogs, error: logsError } = await client
+    .from("generation_logs")
+    .delete()
+    .lt("created_at", `${twoWeeksAgoStr}T00:00:00+08:00`)
+    .select("id");
+  if (logsError) console.error("[cleanup] 删除日志失败:", logsError.message);
+  else results.logsDeleted = deletedLogs?.length || 0;
+
+  return results;
+}
+
+/** 获取本周起止日期（周一~周日） */
+export function getWeekRange(date?: Date): { weekStart: string; weekEnd: string } {
+  const d = date || new Date();
+  const shanghaiStr = d.toLocaleString('sv-SE', { timeZone: 'Asia/Shanghai' });
+  const shanghaiDate = new Date(shanghaiStr);
+  const day = shanghaiDate.getDay();
+  const mondayOffset = day === 0 ? -6 : 1 - day;
+
+  const monday = new Date(shanghaiDate);
+  monday.setDate(shanghaiDate.getDate() + mondayOffset);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+
+  const fmt = (dt: Date) => dt.toLocaleString('sv-SE', { timeZone: 'Asia/Shanghai' }).split(' ')[0];
+  return { weekStart: fmt(monday), weekEnd: fmt(sunday) };
 }

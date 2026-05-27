@@ -8,6 +8,18 @@ import {
 /**
  * 将 Supabase snake_case 新闻行转换为前端 camelCase 格式
  */
+
+/** 从 overview HTML 中推算新闻条数 */
+function deriveNewsCount(overview: string, dbCount: number): number {
+  if (dbCount > 0) return dbCount;
+  if (!overview) return 0;
+  const newsNums = overview.match(/#(\d+)<\/code>/g);
+  if (newsNums && newsNums.length > 0) {
+    return Math.max(...newsNums.map(m => parseInt(m.match(/#(\d+)/)?.[1] || '0', 10)));
+  }
+  return 0;
+}
+
 function transformNewsRow(row: Record<string, unknown>) {
   return {
     id: row.id,
@@ -49,7 +61,7 @@ export async function GET(request: NextRequest) {
           id: r.id,
           reportDate: r.report_date,
           overview: r.overview,
-          newsCount: r.news_count,
+          newsCount: deriveNewsCount(r.overview as string || '', r.news_count as number),
         })
       );
       return NextResponse.json({ success: true, data: transformed }, { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" } });
@@ -83,13 +95,14 @@ export async function GET(request: NextRequest) {
     const totalNewsCount = newsRows.length;
     const limitedNews = top ? newsRows.slice(0, parseInt(top, 10) || 10) : newsRows;
 
+    const derivedCount = deriveNewsCount(r.overview as string || '', r.news_count as number);
     const transformed = {
       id: r.id,
       reportDate: r.report_date,
       overview: r.overview,
       hotTopics: r.hot_topics,
-      newsCount: r.news_count,
-      totalNewsCount,
+      newsCount: derivedCount,
+      totalNewsCount: totalNewsCount || derivedCount,
       news: limitedNews.map(transformNewsRow),
       createdAt: r.created_at,
     };

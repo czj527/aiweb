@@ -119,9 +119,15 @@ export async function POST(request: NextRequest) {
         return await handleDailyGenerate();
       case "leaderboard":
         return await handleLeaderboardFetch();
+      case "weekly":
+        // 周报生成转发到专门的路由
+        return NextResponse.redirect(new URL('/api/admin/generate-weekly', request.url));
+      case "cleanup":
+        // 数据清理转发到专门的路由
+        return NextResponse.redirect(new URL('/api/admin/cleanup', request.url));
       default:
         return NextResponse.json(
-          { error: "未知操作，支持: juya-check, daily, leaderboard" },
+          { error: "未知操作，支持: juya-check, daily, leaderboard, weekly, cleanup" },
           { status: 400 }
         );
     }
@@ -194,9 +200,11 @@ async function handleJuyaCheck() {
       const juyaReport = await fetchJuyaDailyReport();
       try {
         if (juyaReport) {
-          reportId = await createDailyReport(today, juyaReport.content, [], []);
+          const newsNums = juyaReport.content.match(/#(\d+)<\/code>/g);
+          const overviewNewsCount = newsNums ? Math.max(...newsNums.map(m => parseInt(m.match(/#(\d+)/)?.[1] || '0', 10))) : processedNews.length;
+          reportId = await createDailyReport(today, juyaReport.content, [], [], overviewNewsCount);
         } else {
-          reportId = await createDailyReport(today, `今日共 ${processedNews.length} 条AI资讯`, [], []);
+          reportId = await createDailyReport(today, `今日共 ${processedNews.length} 条AI资讯`, [], [], processedNews.length);
         }
         console.log(`[AdminSync] Created daily report: ${reportId}`);
       } catch {
@@ -265,7 +273,9 @@ async function handleDailyGenerate() {
 
     let reportId: string | null = null;
     try {
-      reportId = await createDailyReport(today, juyaReport.content, [], []);
+      const newsNums = juyaReport.content.match(/#(\d+)<\/code>/g);
+      const overviewNewsCount = newsNums ? Math.max(...newsNums.map(m => parseInt(m.match(/#(\d+)/)?.[1] || '0', 10))) : 0;
+      reportId = await createDailyReport(today, juyaReport.content, [], [], overviewNewsCount);
     } catch {
       console.warn("[AdminSync] Cannot create daily report in DB (Supabase unavailable)");
     }
