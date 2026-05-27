@@ -10,11 +10,9 @@ export async function generateMetadata() {
 }
 
 export default function TimelinePage() {
-  // 客户端组件自行从 /api/milestones 获取数据
-  // 避免构建时依赖 Supabase 环境变量导致 SSR 失败
   return (
     <main className="min-h-screen bg-background">
-      <TimelineClient initialMilestones={[]} />
+      <TimelineClient />
     </main>
   );
 }

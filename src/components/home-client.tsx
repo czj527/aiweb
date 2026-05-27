@@ -96,7 +96,7 @@ export function HomeClient({ days: initialDays }: HomeClientProps) {
       return next;
     });
 
-    setTimeout(() => setAnimatingDay(new Map()), 400);
+    setTimeout(() => setAnimatingDay(new Map()), 800);
   }, [activeCategoryByDay]);
 
   if (loading) {
@@ -214,10 +214,10 @@ export function HomeClient({ days: initialDays }: HomeClientProps) {
           100% { opacity: 1; transform: translateX(0); }
         }
         .page-flip-in-right {
-          animation: pageFlipInRight 0.6s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+          animation: pageFlipInRight 1.2s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
         }
         .page-flip-in-left {
-          animation: pageFlipInLeft 0.6s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+          animation: pageFlipInLeft 1.2s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
         }
       `}</style>
     </main>
