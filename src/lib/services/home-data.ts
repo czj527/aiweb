@@ -72,8 +72,8 @@ async function fetchFromDB(startDate: string): Promise<DayData[]> {
   const { data, error } = await client
     .from('news_items')
     .select('id, title, summary, source_name, source_url, category, published_at')
-    .gte('published_at', `${startDate}T00:00:00`)
-    .lt('published_at', `${todayStr}T23:59:59`)
+    .gte('published_at', `${startDate}T00:00:00+08:00`)
+    .lt('published_at', `${todayStr}T23:59:59+08:00`)
     .order('published_at', { ascending: false })
     .limit(350);
 
