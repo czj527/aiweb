@@ -140,7 +140,7 @@ function ToolCard({ tool, featured, index }: { tool: AITool; featured?: boolean;
       href={tool.url}
       target="_blank"
       rel="noopener noreferrer"
-      className={`group block bg-card rounded-xl border border-border/40 p-5 card-hover animate-stagger-fade stagger-${stagger} ${
+      className={`group block bg-card rounded-2xl border border-border/40 p-5 card-hover animate-stagger-fade stagger-${stagger} ${
         featured ? 'border-primary/20 bg-gradient-to-br from-card to-primary/[0.03]' : ''
       }`}
     >

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Loader2, RefreshCw } from 'lucide-react';
 import type { DayData } from '@/lib/services/home-data';
 
@@ -22,6 +22,8 @@ export function HomeClient({ days: initialDays }: HomeClientProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [fetched, setFetched] = useState(false);
+  // Per-day animation state
+  const [animatingDay, setAnimatingDay] = useState<Map<number, 'left' | 'right'>>(new Map());
 
   useEffect(() => {
     if (fetched) return;
@@ -55,6 +57,20 @@ export function HomeClient({ days: initialDays }: HomeClientProps) {
     return map;
   });
 
+  const categoryIndexRef = useRef<Map<string, number>>(new Map());
+
+  useEffect(() => {
+    const indexMap = new Map<string, number>();
+    days.forEach((day) => {
+      day.categories.forEach((cat) => {
+        if (!indexMap.has(cat.category)) {
+          indexMap.set(cat.category, indexMap.size);
+        }
+      });
+    });
+    categoryIndexRef.current = indexMap;
+  }, [days]);
+
   useEffect(() => {
     setActiveCategoryByDay((prev) => {
       const next = new Map(prev);
@@ -66,8 +82,22 @@ export function HomeClient({ days: initialDays }: HomeClientProps) {
   }, [days]);
 
   const handleCategorySwitch = useCallback((dayIndex: number, category: string) => {
-    setActiveCategoryByDay((prev) => { const next = new Map(prev); next.set(dayIndex, category); return next; });
-  }, []);
+    const oldCategory = activeCategoryByDay.get(dayIndex);
+    const indexMap = categoryIndexRef.current;
+    const oldIndex = oldCategory ? (indexMap.get(oldCategory) ?? 0) : 0;
+    const newIndex = indexMap.get(category) ?? 0;
+    const direction = newIndex > oldIndex ? 'left' : 'right';
+
+    setAnimatingDay(new Map([[dayIndex, direction]]));
+
+    setActiveCategoryByDay((prev) => {
+      const next = new Map(prev);
+      next.set(dayIndex, category);
+      return next;
+    });
+
+    setTimeout(() => setAnimatingDay(new Map()), 400);
+  }, [activeCategoryByDay]);
 
   if (loading) {
     return (
@@ -105,16 +135,23 @@ export function HomeClient({ days: initialDays }: HomeClientProps) {
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 page-enter">
+      {/* 每日资讯标题 */}
+      <div className="mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold font-display text-foreground">每日资讯</h1>
+        <p className="text-sm text-muted-foreground mt-1">AI领域最新动态，每日自动聚合更新</p>
+      </div>
+
       <div className="flex flex-col gap-8">
         {days.map((day, dayIndex) => {
           const activeCategory = activeCategoryByDay.get(dayIndex) || day.categories[0]?.category || '';
           const activeGroup = day.categories.find((c) => c.category === activeCategory);
           const totalCount = day.categories.reduce((sum, c) => sum + c.count, 0);
+          const dayAnimDir = animatingDay.get(dayIndex);
 
           return (
             <section
               key={day.date}
-              className={`bg-card rounded-xl shadow-card card-hover animate-stagger-fade stagger-${Math.min(dayIndex + 1, 8)}`}
+              className={`bg-card rounded-2xl shadow-card card-hover animate-stagger-fade stagger-${Math.min(dayIndex + 1, 8)}`}
             >
               <div className="px-6 pt-5 pb-3 flex items-center justify-between">
                 <h2 className="font-display font-bold text-lg text-card-foreground">{day.dateLabel}</h2>
@@ -122,19 +159,14 @@ export function HomeClient({ days: initialDays }: HomeClientProps) {
               </div>
               {day.categories.length > 0 && (
                 <div className="px-6 pb-3">
-                  <div className="flex gap-2 flex-wrap">
+                  <div className="flex gap-2">
                     {day.categories.map((cat) => {
                       const isActive = cat.category === activeCategory;
+                      const flexVal = Math.max((cat.count / totalCount) * 10, 1.5);
                       return (
-                        <button
-                          key={cat.category}
-                          onClick={() => handleCategorySwitch(dayIndex, cat.category)}
-                          className={`rounded-full px-4 py-1.5 text-sm text-center transition-all duration-300 ${
-                            isActive
-                              ? 'bg-primary text-primary-foreground font-medium shadow-sm'
-                              : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80'
-                          }`}
-                        >
+                        <button key={cat.category} onClick={() => handleCategorySwitch(dayIndex, cat.category)}
+                          className={`rounded-md px-4 py-2 text-sm text-center transition-all duration-200 ${isActive ? 'bg-primary text-primary-foreground font-medium' : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80'}`}
+                          style={{ flex: flexVal }}>
                           {cat.category}<span className="ml-1 text-xs opacity-60">{cat.count}</span>
                         </button>
                       );
@@ -142,15 +174,21 @@ export function HomeClient({ days: initialDays }: HomeClientProps) {
                   </div>
                 </div>
               )}
-              <div className="px-6 pb-5">
+              <div className="px-6 pb-5 overflow-hidden relative">
                 {activeGroup && activeGroup.items.length > 0 && (
-                  <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
-                    {activeGroup.items.map((item, itemIdx) => (
+                  <div
+                    key={activeCategory}
+                    className={`grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4 ${
+                      dayAnimDir
+                        ? (dayAnimDir === 'left' ? 'page-flip-in-right' : 'page-flip-in-left')
+                        : ''
+                    }`}
+                  >
+                    {activeGroup.items.map((item) => (
                       <Link
                         key={item.id}
                         href={`/daily?date=${day.date}&highlight=${encodeURIComponent(item.title)}`}
-                        className="group block border border-border/25 rounded-lg bg-muted/30 px-5 py-4 hover:border-primary/30 hover:bg-muted/50 transition-all duration-300 hover:shadow-float"
-                        style={{ animationDelay: `${itemIdx * 0.04}s` }}
+                        className="group block border border-border/25 rounded-xl bg-muted/30 px-5 py-4 hover:border-primary/30 hover:bg-muted/50 transition-all duration-300 hover:shadow-float"
                       >
                         <h3 className="text-base font-medium text-card-foreground group-hover:text-primary transition-colors duration-200">{item.title}</h3>
                         <p className="text-xs text-muted-foreground/60 mt-1.5">{item.source}</p>
@@ -164,6 +202,24 @@ export function HomeClient({ days: initialDays }: HomeClientProps) {
           );
         })}
       </div>
+
+      {/* 完整翻页动画 */}
+      <style jsx global>{`
+        @keyframes pageFlipInRight {
+          0% { opacity: 0; transform: translateX(100%); }
+          100% { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes pageFlipInLeft {
+          0% { opacity: 0; transform: translateX(-100%); }
+          100% { opacity: 1; transform: translateX(0); }
+        }
+        .page-flip-in-right {
+          animation: pageFlipInRight 0.6s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+        }
+        .page-flip-in-left {
+          animation: pageFlipInLeft 0.6s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+        }
+      `}</style>
     </main>
   );
 }

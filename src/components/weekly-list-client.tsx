@@ -97,7 +97,7 @@ export function WeeklyListClient({ items: initialItems }: WeeklyListClientProps)
           <Link
             key={item.id}
             href={`/weekly/${item.id}`}
-            className={`block p-6 bg-card rounded-xl border border-border/30 hover:border-primary/30 hover:shadow-float transition-all duration-300 group card-hover animate-stagger-fade stagger-${Math.min(i + 3, 8)}`}
+            className={`block p-6 bg-card rounded-2xl border border-border/30 hover:border-primary/30 hover:shadow-float transition-all duration-300 group card-hover animate-stagger-fade stagger-${Math.min(i + 3, 8)}`}
           >
             <div className="flex items-start justify-between">
               <div className="flex-1 min-w-0">

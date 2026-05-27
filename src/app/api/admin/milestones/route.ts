@@ -1,19 +1,19 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+function getSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+  if (!url || !key) throw new Error('Missing Supabase env vars');
+  return createClient(url, key);
+}
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '210527';
 
 async function verifyAdmin(req: NextRequest): Promise<boolean> {
-  // 检查请求头
   const adminPassword = req.headers.get('admin-password');
   if (adminPassword === ADMIN_PASSWORD) return true;
 
-  // 检查 cookie
   const cookieHeader = req.headers.get('cookie');
   if (cookieHeader && cookieHeader.includes('admin-auth=true')) return true;
 
@@ -26,6 +26,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    const supabase = getSupabase();
     const { data: milestones, error } = await supabase
       .from('ai_milestones')
       .select('*')
@@ -48,6 +49,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const supabase = getSupabase();
     const body = await req.json();
     const { date, title, description, category, importance, link_url } = body;
 
@@ -85,6 +87,7 @@ export async function PATCH(req: NextRequest) {
   }
 
   try {
+    const supabase = getSupabase();
     const body = await req.json();
     const { id, date, title, description, category, importance, link_url } = body;
 
@@ -124,6 +127,7 @@ export async function DELETE(req: NextRequest) {
   }
 
   try {
+    const supabase = getSupabase();
     const body = await req.json();
     const { id } = body;
 
