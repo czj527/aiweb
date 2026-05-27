@@ -260,11 +260,11 @@ export async function updateDailyReportNewsCount(reportId: string): Promise<void
   await client.from("daily_reports").update({ news_count: count || 0 }).eq("id", reportId);
 }
 
-/** 获取最近 N 小时的新闻（按重要性排序） */
-export async function getRecentNews(hours: number = 24, limit: number = 50): Promise<NewsItemRow[]> {
+/** 获取最近 N 小时的新闻标题和 URL（用于去重） */
+export async function getRecentNews(hours: number = 24, limit: number = 50): Promise<Array<{ title: string; source_url: string }>> {
   const client = getSupabaseClient();
   const since = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
-  const { data, error } = await client.from("news_items").select("*").gte("published_at", since).order("importance_score", { ascending: false }).limit(limit);
+  const { data, error } = await client.from("news_items").select("title, source_url").gte("published_at", since).limit(limit);
   if (error) throw new Error(`获取最近新闻失败: ${error.message}`);
   return data || [];
 }
