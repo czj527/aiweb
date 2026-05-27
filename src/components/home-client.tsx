@@ -139,6 +139,7 @@ export function HomeClient({ days: initialDays }: HomeClientProps) {
       <div className="mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold font-display text-foreground">每日资讯</h1>
         <p className="text-sm text-muted-foreground mt-1">AI领域最新动态，每日自动聚合更新</p>
+        <p className="text-xs text-muted-foreground/50 mt-2">本周一至今的资讯，按日期和分类分组展示 · 点击资讯卡片跳转到当日早报详情</p>
       </div>
 
       <div className="flex flex-col gap-8">
